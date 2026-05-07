@@ -1,0 +1,778 @@
+[
+  {
+    "id": "9194807241",
+    "type": "IssuesEvent",
+    "actor": {
+      "id": 141844,
+      "login": "aviflax",
+      "display_login": "aviflax",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/aviflax",
+      "avatar_url": "https://avatars.githubusercontent.com/u/141844?"
+    },
+    "repo": {
+      "id": 937253475,
+      "name": "anthropics/claude-code",
+      "url": "https://api.github.com/repos/anthropics/claude-code"
+    },
+    "payload": {
+      "action": "opened",
+      "issue": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/57015",
+        "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+        "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/labels{/name}",
+        "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/comments",
+        "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/events",
+        "html_url": "https://github.com/anthropics/claude-code/issues/57015",
+        "id": 4399560449,
+        "node_id": "I_kwDON91aY88AAAABBjv3AQ",
+        "number": 57015,
+        "title": "[FEATURE] Pass relative paths to files under cwd when invoking tools",
+        "user": {
+          "login": "aviflax",
+          "id": 141844,
+          "node_id": "MDQ6VXNlcjE0MTg0NA==",
+          "avatar_url": "https://avatars.githubusercontent.com/u/141844?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/aviflax",
+          "html_url": "https://github.com/aviflax",
+          "followers_url": "https://api.github.com/users/aviflax/followers",
+          "following_url": "https://api.github.com/users/aviflax/following{/other_user}",
+          "gists_url": "https://api.github.com/users/aviflax/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/aviflax/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/aviflax/subscriptions",
+          "organizations_url": "https://api.github.com/users/aviflax/orgs",
+          "repos_url": "https://api.github.com/users/aviflax/repos",
+          "events_url": "https://api.github.com/users/aviflax/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/aviflax/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "labels": [
+          {
+            "id": 8190926415,
+            "node_id": "LA_kwDON91aY88AAAAB6DeeTw",
+            "url": "https://api.github.com/repos/anthropics/claude-code/labels/enhancement",
+            "name": "enhancement",
+            "color": "A2D9CE",
+            "default": true,
+            "description": "New feature or request"
+          }
+        ],
+        "state": "open",
+        "locked": false,
+        "assignees": [
+
+        ],
+        "milestone": null,
+        "comments": 0,
+        "created_at": "2026-05-07T14:31:56Z",
+        "updated_at": "2026-05-07T14:31:56Z",
+        "closed_at": null,
+        "assignee": null,
+        "issue_field_values": [
+
+        ],
+        "type": null,
+        "active_lock_reason": null,
+        "sub_issues_summary": {
+          "total": 0,
+          "completed": 0,
+          "percent_completed": 0
+        },
+        "issue_dependencies_summary": {
+          "blocked_by": 0,
+          "total_blocked_by": 0,
+          "blocking": 0,
+          "total_blocking": 0
+        },
+        "body": "### Preflight Checklist\n\n- [x] I have searched [existing requests](https://github.com/anthropics/claude-code/issues?q=is%3Aissue%20label%3Aenhancement) and this feature hasn't been requested yet\n- [x] This is a single feature request (not multiple features)\n\n### Problem Statement\n\nCC frequently runs a programs and passes paths to those programs as arguments. It almost always passes those paths as absolute paths. This makes the commands longer, and they require a little more cognitive effort to read and understand. \n\n### Proposed Solution\n\nI would prefer that CC pass those paths as relative paths, as long as they are within/below the current working dir.\n\n(Also, when CC is passing a path to a file/dir that is *not* within the CWD, it *should* use an absolute path. Sometimes I see it use paths like `../../../../../tmp/foo.txt` when `/tmp/foo.txt` would be way better)\n\n### Alternative Solutions\n\n_No response_\n\n### Priority\n\nLow - Nice to have\n\n### Feature Category\n\nOther\n\n### Use Case Example\n\n_No response_\n\n### Additional Context\n\n_No response_",
+        "reactions": {
+          "url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/reactions",
+          "total_count": 0,
+          "+1": 0,
+          "-1": 0,
+          "laugh": 0,
+          "hooray": 0,
+          "confused": 0,
+          "heart": 0,
+          "rocket": 0,
+          "eyes": 0
+        },
+        "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/timeline",
+        "performed_via_github_app": null,
+        "state_reason": null,
+        "pinned_comment": null
+      }
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:32:05Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194802282",
+    "type": "IssuesEvent",
+    "actor": {
+      "id": 141844,
+      "login": "aviflax",
+      "display_login": "aviflax",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/aviflax",
+      "avatar_url": "https://avatars.githubusercontent.com/u/141844?"
+    },
+    "repo": {
+      "id": 937253475,
+      "name": "anthropics/claude-code",
+      "url": "https://api.github.com/repos/anthropics/claude-code"
+    },
+    "payload": {
+      "action": "labeled",
+      "issue": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/57015",
+        "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+        "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/labels{/name}",
+        "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/comments",
+        "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/events",
+        "html_url": "https://github.com/anthropics/claude-code/issues/57015",
+        "id": 4399560449,
+        "node_id": "I_kwDON91aY88AAAABBjv3AQ",
+        "number": 57015,
+        "title": "[FEATURE] Pass relative paths to files under cwd when invoking tools",
+        "user": {
+          "login": "aviflax",
+          "id": 141844,
+          "node_id": "MDQ6VXNlcjE0MTg0NA==",
+          "avatar_url": "https://avatars.githubusercontent.com/u/141844?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/aviflax",
+          "html_url": "https://github.com/aviflax",
+          "followers_url": "https://api.github.com/users/aviflax/followers",
+          "following_url": "https://api.github.com/users/aviflax/following{/other_user}",
+          "gists_url": "https://api.github.com/users/aviflax/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/aviflax/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/aviflax/subscriptions",
+          "organizations_url": "https://api.github.com/users/aviflax/orgs",
+          "repos_url": "https://api.github.com/users/aviflax/repos",
+          "events_url": "https://api.github.com/users/aviflax/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/aviflax/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "labels": [
+          {
+            "id": 8190926415,
+            "node_id": "LA_kwDON91aY88AAAAB6DeeTw",
+            "url": "https://api.github.com/repos/anthropics/claude-code/labels/enhancement",
+            "name": "enhancement",
+            "color": "A2D9CE",
+            "default": true,
+            "description": "New feature or request"
+          }
+        ],
+        "state": "open",
+        "locked": false,
+        "assignees": [
+
+        ],
+        "milestone": null,
+        "comments": 0,
+        "created_at": "2026-05-07T14:31:56Z",
+        "updated_at": "2026-05-07T14:31:56Z",
+        "closed_at": null,
+        "assignee": null,
+        "issue_field_values": [
+
+        ],
+        "type": null,
+        "active_lock_reason": null,
+        "sub_issues_summary": {
+          "total": 0,
+          "completed": 0,
+          "percent_completed": 0
+        },
+        "issue_dependencies_summary": {
+          "blocked_by": 0,
+          "total_blocked_by": 0,
+          "blocking": 0,
+          "total_blocking": 0
+        },
+        "body": "### Preflight Checklist\n\n- [x] I have searched [existing requests](https://github.com/anthropics/claude-code/issues?q=is%3Aissue%20label%3Aenhancement) and this feature hasn't been requested yet\n- [x] This is a single feature request (not multiple features)\n\n### Problem Statement\n\nCC frequently runs a programs and passes paths to those programs as arguments. It almost always passes those paths as absolute paths. This makes the commands longer, and they require a little more cognitive effort to read and understand. \n\n### Proposed Solution\n\nI would prefer that CC pass those paths as relative paths, as long as they are within/below the current working dir.\n\n(Also, when CC is passing a path to a file/dir that is *not* within the CWD, it *should* use an absolute path. Sometimes I see it use paths like `../../../../../tmp/foo.txt` when `/tmp/foo.txt` would be way better)\n\n### Alternative Solutions\n\n_No response_\n\n### Priority\n\nLow - Nice to have\n\n### Feature Category\n\nOther\n\n### Use Case Example\n\n_No response_\n\n### Additional Context\n\n_No response_",
+        "reactions": {
+          "url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/reactions",
+          "total_count": 0,
+          "+1": 0,
+          "-1": 0,
+          "laugh": 0,
+          "hooray": 0,
+          "confused": 0,
+          "heart": 0,
+          "rocket": 0,
+          "eyes": 0
+        },
+        "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/57015/timeline",
+        "performed_via_github_app": null,
+        "state_reason": null,
+        "pinned_comment": null
+      },
+      "label": {
+        "id": 8190926415,
+        "node_id": "LA_kwDON91aY88AAAAB6DeeTw",
+        "url": "https://api.github.com/repos/anthropics/claude-code/labels/enhancement",
+        "name": "enhancement",
+        "color": "A2D9CE",
+        "default": true,
+        "description": "New feature or request"
+      },
+      "labels": [
+        {
+          "id": 8190926415,
+          "node_id": "LA_kwDON91aY88AAAAB6DeeTw",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/enhancement",
+          "name": "enhancement",
+          "color": "A2D9CE",
+          "default": true,
+          "description": "New feature or request"
+        }
+      ]
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:31:58Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194780065",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 172151399,
+      "login": "carolinakitty",
+      "display_login": "carolinakitty",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carolinakitty",
+      "avatar_url": "https://avatars.githubusercontent.com/u/172151399?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:31:27Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194772274",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 170845591,
+      "login": "cesardr776",
+      "display_login": "cesardr776",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cesardr776",
+      "avatar_url": "https://avatars.githubusercontent.com/u/170845591?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:31:15Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194765022",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 81313234,
+      "login": "tanakr1",
+      "display_login": "tanakr1",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/tanakr1",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81313234?"
+    },
+    "repo": {
+      "id": 1230498812,
+      "name": "anthropics/cwc-workshops",
+      "url": "https://api.github.com/repos/anthropics/cwc-workshops"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:31:05Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194763783",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 81313234,
+      "login": "tanakr1",
+      "display_login": "tanakr1",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/tanakr1",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81313234?"
+    },
+    "repo": {
+      "id": 1230385816,
+      "name": "anthropics/cwc-long-running-agents",
+      "url": "https://api.github.com/repos/anthropics/cwc-long-running-agents"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:31:03Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194760740",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 81313234,
+      "login": "tanakr1",
+      "display_login": "tanakr1",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/tanakr1",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81313234?"
+    },
+    "repo": {
+      "id": 1229212156,
+      "name": "anthropics/headvis",
+      "url": "https://api.github.com/repos/anthropics/headvis"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:30:59Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194740909",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 275694570,
+      "login": "chongzhangzc97",
+      "display_login": "chongzhangzc97",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/chongzhangzc97",
+      "avatar_url": "https://avatars.githubusercontent.com/u/275694570?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:30:32Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194728341",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 32271919,
+      "login": "aalopes97",
+      "display_login": "aalopes97",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/aalopes97",
+      "avatar_url": "https://avatars.githubusercontent.com/u/32271919?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:30:15Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194718523",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 9113778,
+      "login": "alanpaul1969",
+      "display_login": "alanpaul1969",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alanpaul1969",
+      "avatar_url": "https://avatars.githubusercontent.com/u/9113778?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:30:02Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194712649",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 18630277,
+      "login": "marlondecol",
+      "display_login": "marlondecol",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/marlondecol",
+      "avatar_url": "https://avatars.githubusercontent.com/u/18630277?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:53Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194708106",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 269614090,
+      "login": "zack-garner",
+      "display_login": "zack-garner",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/zack-garner",
+      "avatar_url": "https://avatars.githubusercontent.com/u/269614090?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:47Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194705158",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 29204970,
+      "login": "Lavemo",
+      "display_login": "Lavemo",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Lavemo",
+      "avatar_url": "https://avatars.githubusercontent.com/u/29204970?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:42Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194689869",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 100904360,
+      "login": "webpooh",
+      "display_login": "webpooh",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/webpooh",
+      "avatar_url": "https://avatars.githubusercontent.com/u/100904360?"
+    },
+    "repo": {
+      "id": 937253475,
+      "name": "anthropics/claude-code",
+      "url": "https://api.github.com/repos/anthropics/claude-code"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:21Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194687996",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 1829522,
+      "login": "nnquan",
+      "display_login": "nnquan",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/nnquan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1829522?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:19Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194682936",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 105627915,
+      "login": "brianmskang",
+      "display_login": "brianmskang",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/brianmskang",
+      "avatar_url": "https://avatars.githubusercontent.com/u/105627915?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:11Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194678992",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 114499495,
+      "login": "YaoYangChung",
+      "display_login": "YaoYangChung",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/YaoYangChung",
+      "avatar_url": "https://avatars.githubusercontent.com/u/114499495?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:29:07Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194672366",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 172151189,
+      "login": "bartbartgo",
+      "display_login": "bartbartgo",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/bartbartgo",
+      "avatar_url": "https://avatars.githubusercontent.com/u/172151189?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:28:58Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194670254",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 152046,
+      "login": "ziwon",
+      "display_login": "ziwon",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/ziwon",
+      "avatar_url": "https://avatars.githubusercontent.com/u/152046?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:28:54Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  },
+  {
+    "id": "9194656793",
+    "type": "WatchEvent",
+    "actor": {
+      "id": 67196406,
+      "login": "e-candeloro",
+      "display_login": "e-candeloro",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/e-candeloro",
+      "avatar_url": "https://avatars.githubusercontent.com/u/67196406?"
+    },
+    "repo": {
+      "id": 1165056385,
+      "name": "anthropics/financial-services",
+      "url": "https://api.github.com/repos/anthropics/financial-services"
+    },
+    "payload": {
+      "action": "started"
+    },
+    "public": true,
+    "created_at": "2026-05-07T14:28:36Z",
+    "org": {
+      "id": 76263028,
+      "login": "anthropics",
+      "gravatar_id": "",
+      "url": "https://api.github.com/orgs/anthropics",
+      "avatar_url": "https://avatars.githubusercontent.com/u/76263028?"
+    }
+  }
+]

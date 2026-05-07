@@ -1,0 +1,46 @@
+[
+  {
+    "id": "111111111",
+    "type": "ReleaseEvent",
+    "repo": {"name": "anthropics/claude-code"},
+    "created_at": "2026-05-06T22:00:00Z",
+    "payload": {
+      "action": "published",
+      "release": {
+        "id": 99991,
+        "tag_name": "v2.1.132",
+        "name": "v2.1.132",
+        "body": "- Fixed something important\n- Added a new feature"
+      }
+    }
+  },
+  {
+    "id": "222222222",
+    "type": "CreateEvent",
+    "repo": {"name": "anthropics/new-open-source-repo"},
+    "created_at": "2026-05-05T10:00:00Z",
+    "payload": {
+      "ref_type": "repository",
+      "ref": null,
+      "description": "A new open source project"
+    }
+  },
+  {
+    "id": "333333333",
+    "type": "IssuesEvent",
+    "repo": {"name": "anthropics/claude-code"},
+    "created_at": "2026-05-05T09:00:00Z",
+    "payload": {"action": "opened"}
+  },
+  {
+    "id": "444444444",
+    "type": "CreateEvent",
+    "repo": {"name": "anthropics/another-repo"},
+    "created_at": "2026-05-04T08:00:00Z",
+    "payload": {
+      "ref_type": "branch",
+      "ref": "feature-branch",
+      "description": null
+    }
+  }
+]
