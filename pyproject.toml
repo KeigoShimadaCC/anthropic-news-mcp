@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anthropic-news-mcp"
+version = "0.1.0"
+description = "MCP server aggregating Anthropic news, model releases, and community signals"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2.0",
+    "httpx>=0.27.0",
+    "feedparser>=6.0.11",
+    "selectolax>=0.3.21",
+    "pydantic>=2.7.0",
+]
+
+[project.optional-dependencies]
+eval = ["anthropic>=0.40.0"]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "respx>=0.21.0",
+    "mypy>=1.10.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+anthropic-news-mcp = "anthropic_news_mcp.server:main"
+
+[project.urls]
+Homepage = "https://github.com/KeigoShimadaCC/anthropic-news-mcp"
+Repository = "https://github.com/KeigoShimadaCC/anthropic-news-mcp"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anthropic_news_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
