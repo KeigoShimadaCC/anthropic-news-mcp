@@ -1,0 +1,281 @@
+# 20 golden Q&A pairs for the anthropic-news-mcp eval suite.
+# Distributed: 8 routing, 5 freshness, 4 search precision, 3 graceful failure.
+
+# ── Routing ────────────────────────────────────────────────────────────────────
+
+- id: q01
+  category: routing
+  prompt: "What's the latest from Anthropic?"
+  expected_tool: get_recent_updates
+  expected_params:
+    limit_max: 20
+  expected_response_must_contain_any:
+    - anthropic
+    - claude
+  rubric_notes: "Default query — should pull from multiple sources, lead with newest."
+
+- id: q02
+  category: routing
+  prompt: "Did Claude Code ship anything this week?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-docs-claude-code
+      - anthropic-github-releases
+    since_present: true
+  expected_response_must_contain_any:
+    - claude-code
+    - Claude Code
+    - changelog
+    - release
+  rubric_notes: "Time-bounded + source-specific. Tests both routing and date math."
+
+- id: q03
+  category: routing
+  prompt: "Show me recent Anthropic research papers."
+  expected_tool: get_recent_updates
+  expected_params:
+    categories_must_include_any:
+      - research
+  expected_response_must_contain_any:
+    - research
+    - paper
+    - anthropic
+  rubric_notes: "Should filter by research category."
+
+- id: q04
+  category: routing
+  prompt: "What's new in the Anthropic Python SDK?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-github-releases
+  expected_response_must_contain_any:
+    - sdk
+    - python
+    - release
+  rubric_notes: "Should target GitHub releases source."
+
+- id: q05
+  category: routing
+  prompt: "Has Anthropic posted any policy or RSP updates lately?"
+  expected_tool: get_recent_updates
+  expected_params:
+    categories_must_include_any:
+      - policy
+  expected_response_must_contain_any:
+    - policy
+    - RSP
+    - safety
+    - responsible
+  rubric_notes: "Should filter by policy category."
+
+- id: q06
+  category: routing
+  prompt: "What's the community saying about Claude on Reddit?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - reddit-claude
+  expected_response_must_contain_any:
+    - reddit
+    - r/ClaudeAI
+    - community
+  rubric_notes: "Should route to reddit source."
+
+- id: q07
+  category: routing
+  prompt: "Are there any high-signal Hacker News stories about Anthropic right now?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - hn-anthropic
+  expected_response_must_contain_any:
+    - hacker news
+    - HN
+    - hackernews
+    - points
+  rubric_notes: "Should route to HN source."
+
+- id: q08
+  category: routing
+  prompt: "List the news sources you have configured."
+  expected_tool: list_sources
+  expected_params: {}
+  expected_response_must_contain_any:
+    - anthropic-newsroom
+    - anthropic-docs-claude-code
+    - hn-anthropic
+  rubric_notes: "Should call list_sources, not hallucinate a list."
+
+# ── Freshness ──────────────────────────────────────────────────────────────────
+
+- id: q09
+  category: freshness
+  prompt: "What did Anthropic announce yesterday?"
+  expected_tool: get_recent_updates
+  expected_params:
+    since_present: true
+  expected_response_must_contain_any:
+    - anthropic
+    - announcement
+    - yesterday
+    - no items
+    - nothing found
+  rubric_notes: "Should pass a since param ~24 hours ago."
+
+- id: q10
+  category: freshness
+  prompt: "Show me anything from the last 3 days."
+  expected_tool: get_recent_updates
+  expected_params:
+    since_present: true
+  expected_response_must_contain_any:
+    - anthropic
+    - day
+    - last 3
+  rubric_notes: "Should compute since = now - 3 days."
+
+- id: q11
+  category: freshness
+  prompt: "What was posted on anthropic.com between April 1 and April 5?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-newsroom
+    since_present: true
+  expected_response_must_contain_any:
+    - April
+    - anthropic
+    - announcement
+    - no items
+  rubric_notes: "Date range query — since=Apr 1, should also filter results ≤ Apr 5."
+
+- id: q12
+  category: freshness
+  prompt: "What's the most recent item in your feed?"
+  expected_tool: get_recent_updates
+  expected_params:
+    limit_max: 5
+  expected_response_must_contain_any:
+    - title
+    - anthropic
+    - latest
+  rubric_notes: "Should return a small limit; item should be real, not hallucinated."
+
+- id: q13
+  category: freshness
+  prompt: "Has anything shipped since Monday?"
+  expected_tool: get_recent_updates
+  expected_params:
+    since_present: true
+  expected_response_must_contain_any:
+    - Monday
+    - week
+    - shipped
+    - no items
+    - nothing
+  rubric_notes: "Relative date — should compute Monday's date correctly."
+
+# ── Search precision ───────────────────────────────────────────────────────────
+
+- id: q14
+  category: search
+  prompt: "Find anything mentioning 'agents' in recent updates."
+  expected_tool: search_updates
+  expected_params:
+    query_contains: agents
+  expected_response_must_contain_any:
+    - agents
+    - agent
+  rubric_notes: "Should use search_updates with query='agents', not get_recent_updates."
+
+- id: q15
+  category: search
+  prompt: "Search for items about MCP."
+  expected_tool: search_updates
+  expected_params:
+    query_contains: MCP
+  expected_response_must_contain_any:
+    - MCP
+    - mcp
+    - model context
+  rubric_notes: "Should use search_updates with query='MCP'."
+
+- id: q16
+  category: search
+  prompt: "Are there any items about pricing or cost changes?"
+  expected_tool: search_updates
+  expected_params:
+    query_contains_any:
+      - pricing
+      - cost
+  expected_response_must_contain_any:
+    - pricing
+    - cost
+    - price
+    - no results
+    - nothing found
+  rubric_notes: "Should search, and be honest if nothing is found."
+
+- id: q17
+  category: search
+  prompt: "Did anything mention Sonnet 4.5?"
+  expected_tool: search_updates
+  expected_params:
+    query_contains_any:
+      - Sonnet
+      - "4.5"
+  expected_response_must_contain_any:
+    - Sonnet
+    - "4.5"
+    - no results
+    - nothing
+  rubric_notes: "Specific model version search."
+
+# ── Graceful failure ───────────────────────────────────────────────────────────
+
+- id: q18
+  category: graceful_failure
+  prompt: "Show me Anthropic's tweets from this week."
+  expected_tool: any
+  expected_response_must_contain_any:
+    - not configured
+    - not available
+    - Twitter
+    - not a source
+    - don't have access
+    - no Twitter
+  rubric_notes: >
+    Twitter is not a configured source. Should NOT hallucinate tweets.
+    Should acknowledge the limitation and optionally suggest alternatives.
+
+- id: q19
+  category: graceful_failure
+  prompt: "What did Dario say in his last interview?"
+  expected_tool: any
+  expected_response_must_contain_any:
+    - not available
+    - don't have
+    - can't find
+    - no source
+    - not covered
+    - suggest
+  rubric_notes: >
+    Individual interview quotes are not covered. Should acknowledge honestly,
+    not hallucinate a quote.
+
+- id: q20
+  category: graceful_failure
+  prompt: "Show me items from 'anthropic-newsroom-typo'."
+  expected_tool: any
+  expected_response_must_contain_any:
+    - not found
+    - doesn't exist
+    - no source
+    - list_sources
+    - available sources
+    - anthropic-newsroom
+  rubric_notes: >
+    Invalid source key. Should not crash. Should tell the user the key is
+    invalid and ideally suggest using list_sources to see valid keys.
