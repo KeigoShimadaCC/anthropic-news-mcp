@@ -25,7 +25,7 @@ def _importance(ups: int) -> Literal[1, 2]:
     return 2 if ups > 500 else 1
 
 
-def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
+def _parse_subreddit(data: dict[str, object]) -> list[NewsItem]:
     items: list[NewsItem] = []
     listing = cast(dict[str, object], data.get("data", {}))
     children = cast(list[dict[str, object]], listing.get("children", []))
@@ -92,7 +92,7 @@ class RedditFetcher(Fetcher):
                 if resp.status_code in (403, 429):
                     continue
                 resp.raise_for_status()
-                all_items.extend(_parse_subreddit(resp.json(), sub))
+                all_items.extend(_parse_subreddit(resp.json()))
 
         all_items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
         return all_items

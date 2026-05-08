@@ -1,0 +1,116 @@
+name: Automated PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      - name: Install dependencies
+        run: uv pip install -e ".[dev]" --system
+
+      - name: Run ruff
+        id: ruff
+        run: |
+          set +e
+          ruff_out=$(ruff check . 2>&1)
+          ruff_exit=$?
+          echo "output<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$ruff_out" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$ruff_exit" >> "$GITHUB_OUTPUT"
+
+      - name: Run mypy
+        id: mypy
+        run: |
+          set +e
+          mypy_out=$(mypy --strict src/anthropic_news_mcp/*.py src/anthropic_news_mcp/fetchers/*.py 2>&1)
+          mypy_exit=$?
+          echo "output<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$mypy_out" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$mypy_exit" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        id: tests
+        run: |
+          set +e
+          test_out=$(pytest -q --tb=short 2>&1)
+          test_exit=$?
+          echo "output<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$test_out" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$test_exit" >> "$GITHUB_OUTPUT"
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ruffExit = '${{ steps.ruff.outputs.exit_code }}';
+            const mypyExit = '${{ steps.mypy.outputs.exit_code }}';
+            const testExit = '${{ steps.tests.outputs.exit_code }}';
+
+            const ruffOut = `${{ steps.ruff.outputs.output }}`;
+            const mypyOut = `${{ steps.mypy.outputs.output }}`;
+            const testOut = `${{ steps.tests.outputs.output }}`;
+
+            const icon = (code) => code === '0' ? '✅' : '❌';
+
+            const body = [
+              '## Automated Review',
+              '',
+              `| Check | Status |`,
+              `|-------|--------|`,
+              `| Ruff lint | ${icon(ruffExit)} |`,
+              `| Mypy (strict) | ${icon(mypyExit)} |`,
+              `| Tests | ${icon(testExit)} |`,
+              '',
+              ruffExit !== '0' ? `<details><summary>Ruff output</summary>\n\n\`\`\`\n${ruffOut}\n\`\`\`\n</details>\n` : '',
+              mypyExit !== '0' ? `<details><summary>Mypy output</summary>\n\n\`\`\`\n${mypyOut}\n\`\`\`\n</details>\n` : '',
+              testExit !== '0' ? `<details><summary>Test output</summary>\n\n\`\`\`\n${testOut}\n\`\`\`\n</details>\n` : '',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('## Automated Review')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

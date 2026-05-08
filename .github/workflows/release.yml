@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv pip install -e ".[dev]" --system
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Build package
+        run: uv build
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1)
+
+          echo "## What's Changed" > /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "### Commits since $PREV_TAG" >> /tmp/changelog.md
+            git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" >> /tmp/changelog.md
+          else
+            echo "### All commits" >> /tmp/changelog.md
+            git log --pretty=format:"- %s (%h)" >> /tmp/changelog.md
+          fi
+
+          echo "" >> /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}" >> /tmp/changelog.md
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const tag = '${{ steps.changelog.outputs.tag }}';
+            const changelog = fs.readFileSync('/tmp/changelog.md', 'utf8');
+
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Release ${tag}`,
+              body: changelog,
+              draft: false,
+              prerelease: tag.includes('-'),
+            });
+
+            const distFiles = require('fs').readdirSync('dist');
+            for (const file of distFiles) {
+              const data = fs.readFileSync(`dist/${file}`);
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.data.id,
+                name: file,
+                data,
+                headers: {
+                  'content-type': file.endsWith('.whl')
+                    ? 'application/zip'
+                    : 'application/x-tar',
+                  'content-length': data.length,
+                },
+              });
+            }
+
+            console.log(`Release created: ${release.data.html_url}`);

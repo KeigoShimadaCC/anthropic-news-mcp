@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "anthropic-news-mcp-schema",
+  "title": "anthropic-news-mcp MCP API Schema",
+  "description": "Tools, resources, and prompts exposed by the anthropic-news-mcp server.",
+  "version": "0.1.0",
+  "tools": [
+    {
+      "name": "ping",
+      "description": "Health check. Returns ok status and server version.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true},
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string"},
+          "server": {"type": "string"},
+          "version": {"type": "string"}
+        },
+        "required": ["status", "server", "version"]
+      }
+    },
+    {
+      "name": "list_sources",
+      "description": "List all configured news sources with keys, descriptions, and status.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true},
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {"type": "string"},
+                "description": {"type": "string"},
+                "enabled": {"type": "boolean"},
+                "categories": {"type": "array", "items": {"type": "string"}},
+                "ttl_seconds": {"type": "integer"},
+                "source_type": {"type": "string", "enum": ["official", "docs", "github", "community"]},
+                "evidence_tier": {"type": "string", "enum": ["high", "medium", "low"]}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get_recent_updates",
+      "description": "Get recent Anthropic news, model releases, Claude Code changelogs, and community signals.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {"type": ["array", "null"], "items": {"type": "string"}, "description": "Optional source keys from list_sources."},
+          "categories": {"type": ["array", "null"], "items": {"type": "string"}, "description": "Optional category filters."},
+          "since": {"type": ["string", "null"], "description": "Timezone-aware ISO datetime, e.g. 2026-04-01T00:00:00Z."},
+          "limit": {"type": "integer", "default": 20, "minimum": 1, "maximum": 100}
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {"type": "array", "items": {"$ref": "#/$defs/NewsItem"}},
+          "sources": {"type": "array", "items": {"$ref": "#/$defs/SourceHealth"}}
+        }
+      }
+    },
+    {
+      "name": "search_updates",
+      "description": "Full-text search across all cached items. Case-insensitive.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
+      "inputSchema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {"type": "string", "description": "Non-blank search string."},
+          "limit": {"type": "integer", "default": 10, "minimum": 1, "maximum": 50}
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {"type": "array", "items": {"$ref": "#/$defs/NewsItem"}},
+          "query": {"type": "string"}
+        }
+      }
+    },
+    {
+      "name": "get_source_health",
+      "description": "Show operational status for each source.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true},
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {"type": "array", "items": {"$ref": "#/$defs/SourceHealth"}}
+        }
+      }
+    },
+    {
+      "name": "get_update_detail",
+      "description": "Return one update with normalized page text, stable excerpts, content hash, and provenance.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
+      "inputSchema": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string"},
+          "refresh": {"type": "boolean", "default": false},
+          "max_chars": {"type": "integer", "default": 12000, "minimum": 1, "maximum": 40000},
+          "excerpt_query": {"type": ["string", "null"]}
+        }
+      }
+    },
+    {
+      "name": "search_web_sources",
+      "description": "Search configured upstream/cached sources with source/date/type/category/tag filters.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
+      "inputSchema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {"type": "string"},
+          "sources": {"type": ["array", "null"], "items": {"type": "string"}},
+          "categories": {"type": ["array", "null"], "items": {"type": "string"}},
+          "source_types": {"type": ["array", "null"], "items": {"type": "string"}},
+          "importance": {"type": ["array", "null"], "items": {"type": "integer", "enum": [1, 2, 3]}},
+          "tags": {"type": ["array", "null"], "items": {"type": "string"}},
+          "since": {"type": ["string", "null"]},
+          "until": {"type": ["string", "null"]},
+          "limit": {"type": "integer", "default": 20, "minimum": 1, "maximum": 100},
+          "refresh": {"type": "boolean", "default": false}
+        }
+      }
+    },
+    {
+      "name": "get_timeline",
+      "description": "Return a chronological, citation-ready timeline for a topic.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
+      "inputSchema": {
+        "type": "object",
+        "required": ["topic", "since"],
+        "properties": {
+          "topic": {"type": "string"},
+          "since": {"type": "string"},
+          "until": {"type": ["string", "null"]},
+          "sources": {"type": ["array", "null"], "items": {"type": "string"}},
+          "categories": {"type": ["array", "null"], "items": {"type": "string"}},
+          "source_types": {"type": ["array", "null"], "items": {"type": "string"}},
+          "limit": {"type": "integer", "default": 100, "minimum": 1, "maximum": 200}
+        }
+      }
+    },
+    {
+      "name": "compare_updates",
+      "description": "Return items first seen or changed since a timestamp.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true},
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "since": {"type": ["string", "null"]},
+          "limit": {"type": "integer", "default": 100, "minimum": 1, "maximum": 200}
+        }
+      }
+    },
+    {
+      "name": "build_digest_context",
+      "description": "Build a citation-ready evidence package for a client model to write a digest.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topic": {"type": ["string", "null"]},
+          "since": {"type": ["string", "null"]},
+          "until": {"type": ["string", "null"]},
+          "categories": {"type": ["array", "null"], "items": {"type": "string"}},
+          "sources": {"type": ["array", "null"], "items": {"type": "string"}},
+          "limit": {"type": "integer", "default": 50, "minimum": 1, "maximum": 100}
+        }
+      }
+    },
+    {
+      "name": "create_research_session",
+      "description": "Create a durable local research session.",
+      "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false},
+      "inputSchema": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": {"type": "string"},
+          "topic": {"type": ["string", "null"]},
+          "filters": {"type": ["object", "null"]}
+        }
+      }
+    },
+    {
+      "name": "save_research_note",
+      "description": "Save a note or follow-up in a research session.",
+      "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false},
+      "inputSchema": {
+        "type": "object",
+        "required": ["session_id", "text"],
+        "properties": {
+          "session_id": {"type": "string"},
+          "text": {"type": "string"},
+          "evidence_ids": {"type": ["array", "null"], "items": {"type": "string"}},
+          "follow_up": {"type": "boolean", "default": false}
+        }
+      }
+    },
+    {
+      "name": "save_research_report",
+      "description": "Save a generated research report supplied by the client/model.",
+      "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false},
+      "inputSchema": {
+        "type": "object",
+        "required": ["session_id", "title", "markdown"],
+        "properties": {
+          "session_id": {"type": "string"},
+          "title": {"type": "string"},
+          "markdown": {"type": "string"},
+          "evidence_ids": {"type": ["array", "null"], "items": {"type": "string"}}
+        }
+      }
+    },
+    {
+      "name": "get_research_session",
+      "description": "Return a research session with notes, reports, follow-ups, and linked evidence.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true},
+      "inputSchema": {
+        "type": "object",
+        "required": ["session_id"],
+        "properties": {
+          "session_id": {"type": "string"}
+        }
+      }
+    },
+    {
+      "name": "evaluate_claims",
+      "description": "Deterministically match claims to evidence excerpts and flag support gaps.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true},
+      "inputSchema": {
+        "type": "object",
+        "required": ["claims"],
+        "properties": {
+          "claims": {"type": "array", "items": {"type": "string"}},
+          "evidence_ids": {"type": ["array", "null"], "items": {"type": "string"}},
+          "session_id": {"type": ["string", "null"]},
+          "query": {"type": ["string", "null"]},
+          "limit": {"type": "integer", "default": 10, "minimum": 1, "maximum": 50}
+        }
+      }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "anthropic-news://sources",
+      "name": "sources",
+      "description": "Configured Anthropic news sources and categories.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "anthropic-news://health",
+      "name": "health",
+      "description": "Cached source health without fetching remote sources.",
+      "mimeType": "application/json"
+    },
+    {
+      "uriTemplate": "anthropic-news://source/{source_key}/latest",
+      "name": "latest-by-source",
+      "description": "Latest cached items for one source. Never fetches remote data.",
+      "mimeType": "application/json"
+    },
+    {
+      "uriTemplate": "anthropic-news://evidence/{evidence_id}",
+      "name": "evidence",
+      "description": "A stored evidence excerpt by stable evidence id.",
+      "mimeType": "application/json"
+    },
+    {
+      "uriTemplate": "anthropic-news://session/{session_id}",
+      "name": "research-session",
+      "description": "A saved research session with notes, reports, and linked evidence.",
+      "mimeType": "application/json"
+    },
+    {
+      "uriTemplate": "anthropic-news://session/{session_id}/reports",
+      "name": "research-session-reports",
+      "description": "Saved reports for a research session.",
+      "mimeType": "application/json"
+    },
+    {
+      "uriTemplate": "anthropic-news://timeline/{session_id}",
+      "name": "research-session-timeline",
+      "description": "Timeline context for a saved research session topic.",
+      "mimeType": "application/json"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "latest_update_digest",
+      "description": "Create a concise digest from the latest Anthropic updates.",
+      "arguments": [{"name": "limit", "description": "Maximum items to include, 1-25.", "required": false}]
+    },
+    {
+      "name": "source_health_report",
+      "description": "Report source freshness and failures."
+    },
+    {
+      "name": "weekly_category_digest",
+      "description": "Create a weekly category digest.",
+      "arguments": [
+        {"name": "category", "description": "One valid Category value.", "required": true},
+        {"name": "since", "description": "Timezone-aware ISO datetime for the week start.", "required": true},
+        {"name": "limit", "description": "Maximum items to include, 1-50.", "required": false}
+      ]
+    },
+    {
+      "name": "generate_digest",
+      "description": "Generate a cited digest from an evidence package.",
+      "arguments": [
+        {"name": "topic", "description": "Optional digest topic.", "required": false},
+        {"name": "since", "description": "Optional ISO datetime.", "required": false},
+        {"name": "limit", "description": "Maximum evidence items to include.", "required": false}
+      ]
+    },
+    {
+      "name": "verify_claims_against_evidence",
+      "description": "Verify claims against stored evidence."
+    },
+    {
+      "name": "research_session_brief",
+      "description": "Brief a saved research session.",
+      "arguments": [{"name": "session_id", "description": "Research session id.", "required": true}]
+    }
+  ],
+  "$defs": {
+    "NewsItem": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "source_key": {"type": "string"},
+        "title": {"type": "string"},
+        "url": {"type": "string", "format": "uri"},
+        "summary": {"type": "string"},
+        "published_at": {"type": ["string", "null"], "format": "date-time"},
+        "discovered_at": {"type": "string", "format": "date-time"},
+        "importance": {"type": "integer", "enum": [1, 2, 3]},
+        "category": {"type": "array", "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "source_type": {"type": "string"},
+        "evidence_tier": {"type": "string"}
+      }
+    },
+    "SourceHealth": {
+      "type": "object",
+      "properties": {
+        "key": {"type": "string"},
+        "status": {"type": "string", "enum": ["live", "cache", "stale", "down", "not_fetched"]},
+        "fetched_at": {"type": "string", "format": "date-time"},
+        "expires_at": {"type": "string", "format": "date-time"},
+        "item_count": {"type": "integer"},
+        "error": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

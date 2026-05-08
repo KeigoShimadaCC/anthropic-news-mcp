@@ -37,8 +37,58 @@ jobs:
       - name: Type check (mypy)
         run: mypy --strict src/anthropic_news_mcp/*.py src/anthropic_news_mcp/fetchers/*.py
 
-      - name: Tests
-        run: pytest -q
+      - name: Dead code check (vulture)
+        run: vulture src/ vulture_whitelist.py --min-confidence 80
+
+      - name: Complexity check (radon)
+        run: |
+          echo "## Complexity Report" >> "$GITHUB_STEP_SUMMARY"
+          radon cc src/ -n C >> "$GITHUB_STEP_SUMMARY" || true
+          violations=$(radon cc src/ -n F)
+          if [ -n "$violations" ]; then
+            echo "::error::Functions with grade F complexity (must refactor):"
+            echo "$violations"
+            exit 1
+          fi
+          echo "Complexity gate passed (no grade F violations)"
+
+      - name: Duplicate code check (pylint)
+        run: pylint src/ --disable=all --enable=duplicate-code --min-similarity-lines=10
+
+      - name: Unused dependencies (deptry)
+        run: deptry src/
+
+      - name: Tech debt report
+        run: |
+          echo "## Tech Debt Summary" >> "$GITHUB_STEP_SUMMARY"
+          count=$(grep -rn "TODO\|FIXME\|HACK\|XXX" src/ --include="*.py" | wc -l | tr -d ' ')
+          echo "Open items: ${count}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$count" -gt 0 ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -rn "TODO\|FIXME\|HACK\|XXX" src/ --include="*.py" >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Tests with coverage
+        run: pytest -q --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+
+      - name: Generate API docs
+        run: pdoc src/anthropic_news_mcp -o /tmp/docs-output --docformat google
+
+      - name: Upload API docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: /tmp/docs-output
+          retention-days: 14
 
       - name: Offline eval
         run: python evals/run_offline_eval.py

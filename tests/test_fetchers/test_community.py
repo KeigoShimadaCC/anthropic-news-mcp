@@ -95,7 +95,7 @@ class TestReddit:
     def items(self):
         cc = json.loads(REDDIT_CC_FIXTURE.read_bytes())
         an = json.loads(REDDIT_AN_FIXTURE.read_bytes())
-        return _parse_subreddit(cc, "ClaudeAI") + _parse_subreddit(an, "anthropic")
+        return _parse_subreddit(cc) + _parse_subreddit(an)
 
     def test_skips_stickied_posts(self):
         data = {
@@ -117,7 +117,7 @@ class TestReddit:
                 ]
             }
         }
-        assert _parse_subreddit(data, "ClaudeAI") == []
+        assert _parse_subreddit(data) == []
 
     def test_source_fields(self, items):
         for item in items:
@@ -134,7 +134,7 @@ class TestReddit:
 
     def test_no_duplicate_ids_within_subreddit(self):
         cc = json.loads(REDDIT_CC_FIXTURE.read_bytes())
-        items = _parse_subreddit(cc, "ClaudeAI")
+        items = _parse_subreddit(cc)
         ids = [i.id for i in items]
         assert len(ids) == len(set(ids))
 
@@ -169,7 +169,7 @@ class TestReddit:
                 ]
             }
         }
-        items = _parse_subreddit(data, "ClaudeAI")
+        items = _parse_subreddit(data)
         assert len(items) == 1
         assert items[0].published_at is None
         assert items[0].sort_at is not None
@@ -196,7 +196,7 @@ class TestReddit:
                 ]
             }
         }
-        items = _parse_subreddit(data, "ClaudeAI")
+        items = _parse_subreddit(data)
         assert len(items) == 1
         assert items[0].importance == 1  # ups fell back to 0
 
@@ -221,6 +221,6 @@ class TestReddit:
                 ]
             }
         }
-        items = _parse_subreddit(data, "ClaudeAI")
+        items = _parse_subreddit(data)
         assert "'" in items[0].title or "&#39;" not in items[0].title
         assert "&amp;" not in items[0].title

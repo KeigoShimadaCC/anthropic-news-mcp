@@ -1,0 +1,70 @@
+name: CI Failure Alert
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, master]
+
+jobs:
+  alert:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const branch = run.head_branch;
+            const sha = run.head_sha.slice(0, 7);
+            const runUrl = run.html_url;
+            const actor = run.triggering_actor?.login || 'unknown';
+
+            const title = `CI Failed on ${branch} (${sha})`;
+
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci',
+            });
+
+            const alreadyOpen = existing.find(i => i.title.startsWith(`CI Failed on ${branch}`));
+            if (alreadyOpen) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: alreadyOpen.number,
+                body: `CI failed again: [${sha}](${runUrl}) (triggered by @${actor})`,
+              });
+              return;
+            }
+
+            const sentryDsnConfigured = false;
+            const sentrySection = sentryDsnConfigured
+              ? `\n## Error Tracking\n\nCheck [Sentry](https://sentry.io) for related exceptions.\n`
+              : `\n## Error Tracking\n\nSentry is not configured. See \`docs/runbooks/sentry-setup.md\` to enable.\n`;
+
+            const body = [
+              `CI failed on \`${branch}\` at commit [\`${sha}\`](${runUrl}).`,
+              '',
+              `**Triggered by:** @${actor}`,
+              `**Run:** ${runUrl}`,
+              '',
+              '## Next Steps',
+              '1. Click the run link above to see the failing step',
+              '2. Check `docs/runbooks/source-failure.md` if a fetcher is failing',
+              '3. Check `docs/runbooks/cache-reset.md` if it is a cache/schema issue',
+              sentrySection,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['ci', 'needs-triage'],
+            });
