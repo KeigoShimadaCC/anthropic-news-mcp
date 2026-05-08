@@ -1,0 +1,43 @@
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+
+- name: feature
+  color: "a2eeef"
+  description: New feature or request
+
+- name: docs
+  color: "0075ca"
+  description: Improvements or additions to documentation
+
+- name: ci
+  color: "e4e669"
+  description: CI/CD pipeline changes
+
+- name: security
+  color: "ee0701"
+  description: Security vulnerability or hardening
+
+- name: dependencies
+  color: "0366d6"
+  description: Pull requests that update a dependency
+
+- name: performance
+  color: "bfd4f2"
+  description: Performance improvements
+
+- name: source-fetcher
+  color: "d4c5f9"
+  description: Adds or modifies a news source fetcher
+
+- name: needs-triage
+  color: "e11d48"
+  description: Issue has not been triaged yet
+
+- name: good first issue
+  color: "7057ff"
+  description: Good for newcomers
+
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed

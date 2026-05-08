@@ -3,11 +3,23 @@
 import asyncio
 import logging
 import re
+import time
 from datetime import UTC, datetime
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
+import httpx
+from tenacity import (
+    AsyncRetrying,
+    RetryError,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
 from . import cache
+from . import metrics as _metrics
 from .config import SOURCE_REGISTRY, SourceConfig
+from .flags import FLAGS
 from .models import Category, EvidenceTier, NewsItem, SourceHealth, SourceStatus, SourceType
 
 _log = logging.getLogger(__name__)
@@ -75,10 +87,20 @@ def _sort_dt(item: NewsItem) -> datetime:
 
 
 async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHealth]:
-    """Fetch one source, updating the cache. Returns (items, health)."""
+    """Fetch one source with exponential-backoff retry, updating the cache."""
+    started = time.perf_counter()
     try:
         fetcher = config.fetcher_cls()
-        items = await fetcher.fetch()
+        items: list[NewsItem] = []
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=1, max=10),
+            retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+            reraise=True,
+        ):
+            with attempt:
+                items = await fetcher.fetch()
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
         cache.save_snapshot(config.key, items, config.ttl_seconds, SourceStatus.LIVE)
         _log.info(
             "source_fetch_succeeded",
@@ -88,11 +110,14 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
                 "status": SourceStatus.LIVE.value,
             },
         )
+        if FLAGS.enable_metrics_logging:
+            _metrics.record_fetch(config.key, len(items), elapsed_ms, success=True)
         health = cache.get_snapshot(config.key)
         if health is None:
             raise RuntimeError(f"Cache write for {config.key!r} did not persist")
         return items, health
-    except Exception as exc:
+    except (Exception, RetryError) as exc:
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
         error_msg = _sanitize_error(exc)
         _log.warning(
             "source_fetch_failed",
@@ -102,6 +127,8 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
                 "exception_type": type(exc).__name__,
             },
         )
+        if FLAGS.enable_metrics_logging:
+            _metrics.record_fetch(config.key, 0, elapsed_ms, success=False)
         # Preserve last-known items from cache even on failure
         cached_items = cache.get_cached_items(config.key)
         status = SourceStatus.STALE if cached_items else SourceStatus.DOWN
@@ -138,8 +165,12 @@ async def get_recent_updates(
             continue
         if cache.is_fresh(config.key):
             targets_fresh.append(config)
+            if FLAGS.enable_metrics_logging:
+                _metrics.record_cache_hit(config.key)
         else:
             targets_stale.append(config)
+            if FLAGS.enable_metrics_logging:
+                _metrics.record_cache_miss(config.key)
 
     # Fetch stale/missing sources concurrently
     stale_results: list[tuple[list[NewsItem], SourceHealth]] = []
