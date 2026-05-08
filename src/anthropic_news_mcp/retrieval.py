@@ -1,6 +1,7 @@
 """Aggregation, dedup, and orchestration across all sources."""
 
 import asyncio
+import logging
 import re
 from datetime import UTC, datetime
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
@@ -9,7 +10,13 @@ from . import cache
 from .config import SOURCE_REGISTRY, SourceConfig
 from .models import Category, NewsItem, SourceHealth, SourceStatus
 
+_log = logging.getLogger(__name__)
 _UTM_RE = re.compile(r"utm_[a-z_]+", re.IGNORECASE)
+_SECRET_VALUE_RE = re.compile(
+    r"(?i)(authorization:\s*bearer\s+)[^\s,;]+|"
+    r"((?:api[_-]?key|access[_-]?token|auth[_-]?token|id[_-]?token|refresh[_-]?token|"
+    r"client[_-]?secret|password|secret|token)=)[^&\s,;]+"
+)
 
 
 def _canonicalize_url(url: str) -> str:
@@ -22,8 +29,12 @@ def _canonicalize_url(url: str) -> str:
 
 
 def _sanitize_error(exc: Exception) -> str:
-    """Truncate error string and strip query params (may contain auth tokens)."""
+    """Truncate error string and strip secrets from URLs, headers, and key/value text."""
     msg = re.sub(r"\?[^\s]*", "?[redacted]", str(exc))
+    msg = _SECRET_VALUE_RE.sub(
+        lambda match: f"{match.group(1) or match.group(2)}[redacted]",
+        msg,
+    )
     return msg[:200]
 
 
@@ -39,6 +50,7 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
         return items, health
     except Exception as exc:
         error_msg = _sanitize_error(exc)
+        _log.warning("fetch failed for %r: %s", config.key, error_msg)
         # Preserve last-known items from cache even on failure
         cached_items = cache.get_cached_items(config.key)
         status = SourceStatus.STALE if cached_items else SourceStatus.DOWN
@@ -85,7 +97,8 @@ async def get_recent_updates(
             *[_fetch_source(c) for c in targets_stale], return_exceptions=True
         )
         for r in results:
-            if isinstance(r, BaseException):
+            if isinstance(r, Exception):
+                _log.warning("_fetch_source raised unexpectedly: %r", type(r).__name__)
                 continue
             stale_results.append(r)
 
@@ -133,6 +146,8 @@ async def get_recent_updates(
 
 
 async def search_updates(query: str, limit: int = 10) -> list[NewsItem]:
+    if not cache.get_all_snapshots():
+        await get_recent_updates(limit=max(limit, 1))
     return cache.search_items(query, limit)
 
 
