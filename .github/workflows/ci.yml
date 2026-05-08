@@ -97,5 +97,11 @@ jobs:
           path: docs/api
           retention-days: 14
 
+      - name: Validate AGENTS.md
+        run: python scripts/validate_agents_md.py
+
+      - name: Dead feature flag detection
+        run: python scripts/check_flags.py
+
       - name: Offline eval
         run: python evals/run_offline_eval.py

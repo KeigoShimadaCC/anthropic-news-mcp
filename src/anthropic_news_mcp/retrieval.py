@@ -209,10 +209,10 @@ async def get_recent_updates(
     for items, health in [*fresh_results, *stale_results]:
         all_healths.append(health)
         for item in items:
-            canonical = _canonicalize_url(str(item.url))
-            existing = grouped.get(canonical)
+            key = _canonicalize_url(str(item.url)) if FLAGS.strict_dedup else str(item.url)
+            existing = grouped.get(key)
             if existing is None or _representative_key(item) > _representative_key(existing):
-                grouped[canonical] = item
+                grouped[key] = item
 
     all_items = list(grouped.values())
 
