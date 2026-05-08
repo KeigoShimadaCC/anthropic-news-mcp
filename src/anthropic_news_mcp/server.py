@@ -757,17 +757,18 @@ def research_session_brief(
 
 
 def _emit_startup_telemetry() -> None:
+    """Emit anonymous usage telemetry to stderr (no external endpoint, opt-out via MCP_TELEMETRY=0)."""
     if not FLAGS.enable_telemetry:
         return
-    _log.info(
-        "server_startup",
-        extra={
-            "version": __version__,
-            "python": sys.version.split()[0],
-            "platform": platform.system(),
-            "source_count": len(SOURCE_REGISTRY),
-        },
-    )
+    event = {
+        "event": "server_startup",
+        "version": __version__,
+        "python": sys.version.split()[0],
+        "platform": platform.system(),
+        "source_count": len(SOURCE_REGISTRY),
+        "enabled_sources": sum(1 for s in SOURCE_REGISTRY if s.enabled),
+    }
+    _log.info("telemetry", extra=event)
 
 
 def main() -> None:

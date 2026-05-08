@@ -15,7 +15,7 @@ def _bool_env(key: str, default: bool) -> bool:
 class FeatureFlags:
     enable_metrics_logging: bool = True
     strict_dedup: bool = True
-    enable_telemetry: bool = False
+    enable_telemetry: bool = True
     enable_remote_transport: bool = False
 
     @classmethod
@@ -23,7 +23,7 @@ class FeatureFlags:
         return cls(
             enable_metrics_logging=_bool_env("MCP_METRICS_LOGGING", True),
             strict_dedup=_bool_env("MCP_STRICT_DEDUP", True),
-            enable_telemetry=_bool_env("MCP_TELEMETRY", False),
+            enable_telemetry=_bool_env("MCP_TELEMETRY", True),
             enable_remote_transport=_bool_env("MCP_REMOTE_TRANSPORT", False),
         )
 
