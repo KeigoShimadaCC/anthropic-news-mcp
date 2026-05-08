@@ -194,7 +194,7 @@ async def search_updates(
     query: Annotated[str, Field(description="Non-blank search string.")],
     limit: Annotated[int, Field(default=10, description="Maximum items to return, 1-50.")] = 10,
 ) -> dict[str, object]:
-    """Full-text search across cached items (title, summary, tags). Case-insensitive.
+    """Full-text search across all cached items. Case-insensitive.
 
     Searches the local SQLite cache. If the cache is cold, the server first
     warms the cache with recent updates.
