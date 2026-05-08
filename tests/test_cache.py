@@ -68,18 +68,23 @@ class TestDbPath:
         """If stat() raises, get_db_path() should still return a path (non-fatal)."""
         cache_home = tmp_path / "stat_fail"
         expected_cache_dir = cache_home / "anthropic-news-mcp"
-        expected_cache_dir.mkdir(parents=True, exist_ok=True)
-        resolved_target = expected_cache_dir.resolve()
         monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
         cache_mod._DB_PATH = None  # type: ignore[attr-defined]
 
         original_stat = Path.stat
+        mkdir_done = {"flag": False}
+        original_mkdir = Path.mkdir
+
+        def tracking_mkdir(self: Path, *args: object, **kwargs: object) -> None:
+            original_mkdir(self, *args, **kwargs)  # type: ignore[arg-type]
+            mkdir_done["flag"] = True
 
         def bad_stat(self: Path, **kwargs: object) -> object:
-            if str(self) == str(resolved_target):
+            if mkdir_done["flag"] and str(self).endswith("anthropic-news-mcp"):
                 raise OSError("simulated stat failure")
             return original_stat(self, **kwargs)
 
+        monkeypatch.setattr(Path, "mkdir", tracking_mkdir)
         monkeypatch.setattr(Path, "stat", bad_stat)
         result = cache_mod.get_db_path()
         assert result == expected_cache_dir / "cache.db"
