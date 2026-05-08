@@ -2,6 +2,7 @@ import json
 import os
 import sqlite3
 import time
+import warnings
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,13 @@ def get_db_path() -> Path:
     cache_home = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
     path = Path(cache_home) / "anthropic-news-mcp" / "cache.db"
     path.parent.mkdir(parents=True, exist_ok=True)
+    resolved = path.parent.resolve()
+    if resolved.stat().st_mode & 0o007:
+        warnings.warn(
+            f"Cache directory {resolved} is world-readable; "
+            "set XDG_CACHE_HOME to a private directory to restrict access.",
+            stacklevel=2,
+        )
     return path
 
 
@@ -205,12 +213,15 @@ def get_all_snapshots() -> list[SourceHealth]:
 def search_items(query: str, limit: int = 10) -> list[NewsItem]:
     """Case-insensitive substring search across title, summary, and tags."""
     init_db()
-    pattern = f"%{query.lower()}%"
+    # Escape LIKE metacharacters so user input is treated as a literal substring,
+    # not a wildcard pattern. Without this, query="_" matches every row.
+    escaped = query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
     with _conn() as db:
         rows = db.execute(
             """
             SELECT payload_json FROM items
-            WHERE LOWER(payload_json) LIKE ?
+            WHERE LOWER(payload_json) LIKE ? ESCAPE '\\'
             ORDER BY published_at DESC
             LIMIT ?
             """,

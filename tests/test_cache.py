@@ -149,6 +149,69 @@ class TestSearch:
         results = cache_mod.search_items("xyzzy_nomatch")
         assert results == []
 
+    def test_search_wildcard_percent_not_expanded(self) -> None:
+        """'%' must be treated as a literal character, not a LIKE wildcard."""
+        item_a = NewsItem(
+            id="w1",
+            title="Claude 3 update",
+            summary="A real item",
+            url="https://anthropic.com/news/w1",  # type: ignore[arg-type]
+            source=Source.ANTHROPIC,
+            source_key="anthropic-newsroom",
+            category=[Category.MODELS],
+            published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            importance=1,
+        )
+        item_b = NewsItem(
+            id="w2",
+            title="Unrelated post",
+            summary="No match here",
+            url="https://anthropic.com/news/w2",  # type: ignore[arg-type]
+            source=Source.ANTHROPIC,
+            source_key="anthropic-newsroom",
+            category=[Category.MODELS],
+            published_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            importance=1,
+        )
+        cache_mod.save_snapshot("anthropic-newsroom", [item_a, item_b], ttl_seconds=3600)
+        # Without fix: "%" → LIKE "%%" → matches every row (any sequence)
+        # With fix:    "%" → LIKE "%\%%" ESCAPE '\' → literal "%" not in any payload → empty
+        results = cache_mod.search_items("%")
+        assert results == [], f"'%' should match nothing, got {len(results)} items"
+
+    def test_search_wildcard_underscore_not_expanded(self) -> None:
+        """'_' in a query must be treated as a literal character, not an any-char wildcard."""
+        # item whose title contains "xspecial" — vulnerable LIKE "_special" would match
+        # it (via x ↔ _), but the fixed literal search for "_special" should not.
+        item_a = NewsItem(
+            id="u1",
+            title="xspecial announcement",
+            summary="Contains xspecial",
+            url="https://anthropic.com/news/u1",  # type: ignore[arg-type]
+            source=Source.ANTHROPIC,
+            source_key="anthropic-newsroom",
+            category=[Category.MODELS],
+            published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            importance=1,
+        )
+        item_b = NewsItem(
+            id="u2",
+            title="Regular news",
+            summary="Nothing here",
+            url="https://anthropic.com/news/u2",  # type: ignore[arg-type]
+            source=Source.ANTHROPIC,
+            source_key="anthropic-newsroom",
+            category=[Category.MODELS],
+            published_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            importance=1,
+        )
+        cache_mod.save_snapshot("anthropic-newsroom", [item_a, item_b], ttl_seconds=3600)
+        # Without fix: "_special" → LIKE "%_special%" → matches "xspecial" → returns item_a
+        # With fix:    "_special" → LIKE "%\_special%" ESCAPE '\' → literal "_special"
+        #              not present in either payload → returns nothing
+        results = cache_mod.search_items("_special")
+        assert results == [], f"'_special' wildcard should not match 'xspecial', got {len(results)} items"
+
     def test_search_respects_limit(self) -> None:
         items = [
             NewsItem(
