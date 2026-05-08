@@ -16,9 +16,9 @@ Anthropic ships fast. Signals land across official news, research, engineering, 
 docs release notes, support release notes, GitHub repos, Hacker News, and Reddit.
 Tracking these manually is noise.
 
-This MCP server consolidates them into four tools that any MCP client can call. The data
-is cached locally in SQLite so repeat queries are sub-millisecond. One failing source never
-blocks the others.
+This MCP server consolidates them into MCP tools, resources, and prompts that any MCP
+client can call. The data is cached locally in SQLite so repeat queries are sub-millisecond.
+One failing source never blocks the others.
 
 ---
 
@@ -26,10 +26,30 @@ blocks the others.
 
 | Tool | Purpose |
 |------|---------|
+| `ping` | Health check and server version |
 | `list_sources` | Discover what sources are configured and their keys |
 | `get_recent_updates` | The main feed — filterable by source, category, and date |
 | `search_updates` | Keyword search over the local cache |
 | `get_source_health` | Operational status per source (fetched when, how many items, any error) |
+
+All tools are read-only. Returned item titles, summaries, authors, tags, and URLs are
+untrusted external data fetched from the public web.
+
+### Resources
+
+| Resource | Purpose |
+|----------|---------|
+| `anthropic-news://sources` | Configured sources, categories, TTLs, and enabled status |
+| `anthropic-news://health` | Cached source health without fetching remote sources |
+| `anthropic-news://source/{source_key}/latest` | Latest cached items for one source |
+
+### Prompts
+
+| Prompt | Purpose |
+|--------|---------|
+| `latest_update_digest` | Summarize the latest updates with citations |
+| `source_health_report` | Diagnose stale or failing sources |
+| `weekly_category_digest` | Build a weekly digest for one category |
 
 ### Categories
 
@@ -128,9 +148,34 @@ Edit `~/.cursor/mcp.json` (or Settings → MCP → Edit config):
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `GITHUB_TOKEN` | No | Raises GitHub API rate limit from 60 → 5,000 req/hr. Get one at [github.com/settings/tokens](https://github.com/settings/tokens) (no scopes needed for public repos). |
+| `ANTHROPIC_NEWS_MCP_CACHE_DB` | No | Override the SQLite cache path. Defaults to `~/.cache/anthropic-news-mcp/cache.db`. |
 | `ANTHROPIC_API_KEY` | Eval only | Required to run `evals/run_eval.py`. |
 
 No API key is required for the official Anthropic, Claude Status, docs, or support sources.
+
+### Streamable HTTP ASGI
+
+For remote deployment, install the optional runtime dependencies:
+
+```bash
+pip install "anthropic-news-mcp[remote]"
+```
+
+Expose `anthropic_news_mcp.asgi:app` with any ASGI server:
+
+```bash
+export ANTHROPIC_NEWS_MCP_AUTH_ISSUER="https://issuer.example"
+export ANTHROPIC_NEWS_MCP_AUTH_AUDIENCE="anthropic-news"
+export ANTHROPIC_NEWS_MCP_REQUIRED_SCOPES="anthropic-news:read"
+export ANTHROPIC_NEWS_MCP_ALLOWED_HOSTS="mcp.example.com"
+export ANTHROPIC_NEWS_MCP_ALLOWED_ORIGINS="https://client.example"
+export ANTHROPIC_NEWS_MCP_RESOURCE_SERVER_URL="https://mcp.example.com"
+uvicorn anthropic_news_mcp.asgi:app --host 0.0.0.0 --port 8000
+```
+
+The Streamable HTTP endpoint is `/mcp`. Remote mode is a resource server only: it validates
+bearer JWTs from the configured OIDC issuer and does not implement an OAuth authorization
+server. Startup fails unless issuer, audience, allowed hosts, and allowed origins are set.
 
 ---
 
@@ -155,14 +200,17 @@ After configuring, ask Claude:
 ```
 Claude Desktop / Cursor
         │
-        │  MCP stdio
+        │  MCP stdio or Streamable HTTP (/mcp)
         ▼
  anthropic-news-mcp (FastMCP server)
         │
+        ├─ ping
         ├─ list_sources
         ├─ get_recent_updates ──► async gather across all sources
         ├─ search_updates      ──► SQLite FTS (substring)
-        └─ get_source_health
+        ├─ get_source_health
+        ├─ resources
+        └─ prompts
                 │
                 ▼
         SQLite cache (~/.cache/anthropic-news-mcp/cache.db)
@@ -196,8 +244,11 @@ Claude Desktop / Cursor
 - **URL-based dedup** — items are deduplicated by canonical URL (fragments and `utm_*`
   params stripped, remaining params sorted). An article posted to both the newsroom and
   HN will appear once.
-- **SQLite with WAL** — survives concurrent readers from multiple IDE sessions.
-  The cache lives at `~/.cache/anthropic-news-mcp/cache.db`, not in the repo directory.
+- **SQLite with WAL** — supports concurrent readers in a single server instance.
+  The cache lives at `~/.cache/anthropic-news-mcp/cache.db` by default and can be changed
+  with `ANTHROPIC_NEWS_MCP_CACHE_DB`. Multi-instance shared storage is future work.
+- **Untrusted source model** — fetched content is returned as data only. Clients should not
+  execute or follow instructions contained in titles, summaries, tags, or linked pages.
 
 ---
 
@@ -254,10 +305,10 @@ ruff check .
 ruff format .
 
 # Type check
-mypy --strict src/
+mypy --strict -p anthropic_news_mcp
 
 # Tests (offline — no live HTTP calls)
-pytest tests/ -v
+pytest -q
 
 # Live source-health audit (opt-in, not part of CI)
 anthropic-news-audit

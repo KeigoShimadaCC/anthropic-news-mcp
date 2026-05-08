@@ -20,6 +20,11 @@ def get_db_path() -> Path:
     global _DB_PATH
     if _DB_PATH is not None:
         return _DB_PATH
+    override = os.environ.get("ANTHROPIC_NEWS_MCP_CACHE_DB")
+    if override:
+        path = Path(override).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
     cache_home = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
     path = Path(cache_home) / "anthropic-news-mcp" / "cache.db"
     path.parent.mkdir(parents=True, exist_ok=True)

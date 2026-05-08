@@ -3,6 +3,7 @@
 import html as html_lib
 import re
 from datetime import UTC, datetime
+from typing import Literal, cast
 
 from ..http import get_client
 from ..models import Category, NewsItem, Source
@@ -20,15 +21,16 @@ def _strip_html(text: str) -> str:
     return _HTML_TAG_RE.sub("", text).strip()
 
 
-def _importance(ups: int) -> int:
+def _importance(ups: int) -> Literal[1, 2]:
     return 2 if ups > 500 else 1
 
 
 def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
     items: list[NewsItem] = []
-    children = data.get("data", {}).get("children", [])  # type: ignore[union-attr]
+    listing = cast(dict[str, object], data.get("data", {}))
+    children = cast(list[dict[str, object]], listing.get("children", []))
     for child in children:
-        post = child.get("data", {})  # type: ignore[union-attr]
+        post = cast(dict[str, object], child.get("data", {}))
         if post.get("stickied") or post.get("pinned"):
             continue
 
@@ -38,18 +40,18 @@ def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
             continue
 
         try:
-            ups = int(float(post.get("ups") or 0))  # type: ignore[arg-type]
+            ups = int(float(str(post.get("ups") or 0)))
         except (ValueError, TypeError):
             ups = 0
         try:
-            num_comments = int(float(post.get("num_comments") or 0))  # type: ignore[arg-type]
+            num_comments = int(float(str(post.get("num_comments") or 0)))
         except (ValueError, TypeError):
             num_comments = 0
         selftext = _decode(_strip_html(str(post.get("selftext") or "")))
 
         summary = selftext[:300] if selftext.strip() else f"{ups} upvotes · {num_comments} comments"
 
-        created_utc = float(post.get("created_utc") or 0)  # type: ignore[arg-type]
+        created_utc = float(str(post.get("created_utc") or 0))
         try:
             published_at = datetime.fromtimestamp(created_utc, tz=UTC)
         except (ValueError, OSError, OverflowError):

@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
+from typing import TypedDict, cast
 
 from .config import SOURCE_REGISTRY, SourceConfig
 from .models import NewsItem
@@ -35,6 +36,24 @@ _REGULARLY_UPDATED = {
 
 @dataclass
 class AuditSourceResult:
+    key: str
+    status: str
+    item_count: int
+    newest_published_at: str | None
+    elapsed_ms: int
+    error: str | None
+    sample_titles: list[str]
+    warnings: list[str]
+
+
+class AuditSummary(TypedDict):
+    total: int
+    ok: int
+    warning: int
+    failed: int
+
+
+class AuditSourceReport(TypedDict):
     key: str
     status: str
     item_count: int
@@ -111,7 +130,8 @@ def _print_table(report: dict[str, object]) -> None:
     print(f"Anthropic source audit ({report['timestamp']})")
     print("source                                status    items  newest                ms")
     print("-" * 78)
-    for source in report["sources"]:  # type: ignore[index]
+    sources = cast(list[AuditSourceReport], report["sources"])
+    for source in sources:
         newest = source["newest_published_at"] or "-"
         print(
             f"{source['key']:<37} {source['status']:<9} "
@@ -121,7 +141,7 @@ def _print_table(report: dict[str, object]) -> None:
             print(f"  warning: {warning}")
         if source["error"]:
             print(f"  error: {source['error']}")
-    summary = report["summary"]  # type: ignore[index]
+    summary = cast(AuditSummary, report["summary"])
     print(
         f"\nsummary: {summary['ok']} ok, {summary['warning']} warning, "
         f"{summary['failed']} failed, {summary['total']} total"
@@ -152,9 +172,10 @@ def main() -> None:
         path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     if args.strict:
+        sources = cast(list[AuditSourceReport], report["sources"])
         bad = [
             source
-            for source in report["sources"]  # type: ignore[index]
+            for source in sources
             if source["key"] in _CANONICAL_REQUIRED and source["status"] == "failed"
         ]
         if bad:

@@ -1,7 +1,7 @@
 """Fetcher for Claude Code release notes (CHANGELOG.md on GitHub)."""
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..http import get_client
 from ..models import Category, NewsItem, Source
@@ -23,7 +23,7 @@ def _parse_changelog_markdown(text: str, limit: int = 10) -> list[NewsItem]:
     items: list[NewsItem] = []
     current_version: str | None = None
     current_bullets: list[str] = []
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     def _flush(version: str, bullets: list[str], idx: int) -> None:
         if not version:

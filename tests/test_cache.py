@@ -30,6 +30,13 @@ def _item(id: str, url: str = "https://anthropic.com/news/test") -> NewsItem:
 
 
 class TestDbPath:
+    def test_env_cache_db_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        override = tmp_path / "custom" / "news.db"
+        cache_mod._DB_PATH = None  # type: ignore[attr-defined]
+        monkeypatch.setenv("ANTHROPIC_NEWS_MCP_CACHE_DB", str(override))
+        assert cache_mod.get_db_path() == override
+        assert override.parent.exists()
+
     def test_world_readable_dir_warns(self, tmp_path: Path) -> None:
         """get_db_path() should warn when the cache directory is world-readable."""
         import pytest

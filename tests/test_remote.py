@@ -81,12 +81,14 @@ async def test_remote_valid_scoped_token_can_initialize(app: Any) -> None:
         "origin": "https://client.example",
         "accept": "application/json, text/event-stream",
     }
-    async with app.router.lifespan_context(app):
-        async with httpx.AsyncClient(
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://testserver",
-        ) as client:
-            response = await client.post("/mcp", headers=headers, json=initialize)
+        ) as client,
+    ):
+        response = await client.post("/mcp", headers=headers, json=initialize)
 
     assert response.status_code == 200
     assert "anthropic-news" in response.text
@@ -94,32 +96,34 @@ async def test_remote_valid_scoped_token_can_initialize(app: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_remote_rejects_bad_origin_and_host(app: Any) -> None:
-    async with app.router.lifespan_context(app):
-        async with httpx.AsyncClient(
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://testserver",
-        ) as client:
-            response = await client.post(
-                "/mcp",
-                headers={
-                    "authorization": "Bearer good",
-                    "origin": "https://bad.example",
-                    "content-type": "application/json",
-                },
-                json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-            )
-            assert response.status_code == 403
+        ) as client,
+    ):
+        response = await client.post(
+            "/mcp",
+            headers={
+                "authorization": "Bearer good",
+                "origin": "https://bad.example",
+                "content-type": "application/json",
+            },
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        )
+        assert response.status_code == 403
 
-            response = await client.post(
-                "http://evil.example/mcp",
-                headers={
-                    "authorization": "Bearer good",
-                    "origin": "https://client.example",
-                    "content-type": "application/json",
-                },
-                json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-            )
-            assert response.status_code == 403
+        response = await client.post(
+            "http://evil.example/mcp",
+            headers={
+                "authorization": "Bearer good",
+                "origin": "https://client.example",
+                "content-type": "application/json",
+            },
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        )
+        assert response.status_code == 403
 
 
 @pytest.mark.asyncio

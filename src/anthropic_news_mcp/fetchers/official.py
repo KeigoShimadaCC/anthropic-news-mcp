@@ -4,7 +4,7 @@ import hashlib
 import re
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal, cast
 
 from selectolax.parser import HTMLParser
 
@@ -120,7 +120,7 @@ def _title_from_anchor(anchor: Any, full_text: str) -> str:
     for tag in ("h1", "h2", "h3", "h4", "h5"):
         node = next((c for c in anchor.iter() if c.tag == tag and c.text(strip=True)), None)
         if node:
-            return node.text(strip=True)
+            return str(node.text(strip=True))
 
     clean = _DATE_RE.sub("", full_text)
     clean = re.sub(
@@ -141,7 +141,7 @@ def parse_anthropic_listing_html(
     default_categories: list[Category],
     href_contains: str | None = None,
     limit: int = 20,
-    importance: int | None = None,
+    importance: Literal[1, 2, 3] | None = None,
 ) -> list[NewsItem]:
     """Parse Anthropic card/listing pages such as /news, /research, and /engineering."""
     tree = HTMLParser(html)
@@ -149,7 +149,7 @@ def parse_anthropic_listing_html(
     seen: set[str] = set()
 
     for a in tree.css("a[href]"):
-        href = a.attributes.get("href", "")
+        href = str(a.attributes.get("href") or "")
         if href_contains and href_contains not in href:
             continue
         if href in {"", "/", page_url}:
@@ -183,7 +183,9 @@ def parse_anthropic_listing_html(
                 source_key=source_key,
                 category=categories,
                 published_at=_parse_date(text),
-                importance=importance or (3 if Category.POLICY in categories else 2),
+                importance=importance
+                if importance is not None
+                else (3 if Category.POLICY in categories else 2),
             )
         )
 
@@ -512,9 +514,9 @@ def parse_status_payloads(
 ) -> list[NewsItem]:
     items: list[NewsItem] = []
 
-    status = (summary or {}).get("status", {})
-    indicator = status.get("indicator")
-    description = status.get("description", "")
+    status = cast(dict[str, object], (summary or {}).get("status", {}))
+    indicator = str(status.get("indicator") or "")
+    description = str(status.get("description") or "")
     if indicator and indicator != "none":
         items.append(
             NewsItem(
@@ -541,7 +543,7 @@ def parse_status_payloads(
     return items
 
 
-def _impact_to_importance(impact: str | None) -> int:
+def _impact_to_importance(impact: str | None) -> Literal[1, 2, 3]:
     value = (impact or "none").lower()
     if value in {"critical", "major"}:
         return 3

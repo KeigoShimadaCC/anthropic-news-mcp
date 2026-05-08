@@ -1,7 +1,8 @@
 """Fetcher for Anthropic GitHub org events (new repos, releases)."""
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import cast
 
 from ..http import get_client
 from ..models import Category, NewsItem, Source
@@ -16,23 +17,24 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
 
     for event in data:
         event_type = str(event.get("type", ""))
-        repo_full = str(event.get("repo", {}).get("name", ""))  # type: ignore[union-attr]
+        repo = cast(dict[str, object], event.get("repo", {}))
+        repo_full = str(repo.get("name", ""))
         repo_name = repo_full.split("/")[-1]
-        payload = event.get("payload", {})
+        payload = cast(dict[str, object], event.get("payload", {}))
         event_id = str(event.get("id", ""))
 
         created_raw = str(event.get("created_at", ""))
         try:
             created_at = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
         except ValueError:
-            created_at = datetime.now(tz=timezone.utc)
+            created_at = datetime.now(tz=UTC)
 
         if event_type == "ReleaseEvent":
-            action = str(payload.get("action", ""))  # type: ignore[union-attr]
+            action = str(payload.get("action", ""))
             if action != "published":
                 continue
-            release = payload.get("release", {})  # type: ignore[union-attr]
-            tag = str(release.get("tag_name", ""))  # type: ignore[union-attr]
+            release = cast(dict[str, object], payload.get("release", {}))
+            tag = str(release.get("tag_name", ""))
             dedup_key = f"release-{repo_full}-{tag}"
             if dedup_key in seen:
                 continue
@@ -41,7 +43,7 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
                 NewsItem(
                     id=f"github-event-{event_id}",
                     title=f"{repo_name} {tag}",
-                    summary=str(release.get("body") or "")[:400],  # type: ignore[union-attr]
+                    summary=str(release.get("body") or "")[:400],
                     url=f"https://github.com/{repo_full}/releases/tag/{tag}",  # type: ignore[arg-type]
                     source=Source.GITHUB,
                     source_key=GitHubOrgEventsFetcher.source_key,
@@ -52,7 +54,7 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
             )
 
         elif event_type == "CreateEvent":
-            ref_type = str(payload.get("ref_type", ""))  # type: ignore[union-attr]
+            ref_type = str(payload.get("ref_type", ""))
             if ref_type != "repository":
                 continue
             dedup_key = f"create-{repo_full}"
@@ -63,7 +65,7 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
                 NewsItem(
                     id=f"github-event-{event_id}",
                     title=f"New repo created: {repo_name}",
-                    summary=str(payload.get("description") or ""),  # type: ignore[union-attr]
+                    summary=str(payload.get("description") or ""),
                     url=f"https://github.com/{repo_full}",  # type: ignore[arg-type]
                     source=Source.GITHUB,
                     source_key=GitHubOrgEventsFetcher.source_key,

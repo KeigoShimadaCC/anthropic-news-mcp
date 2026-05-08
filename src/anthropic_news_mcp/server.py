@@ -246,7 +246,8 @@ async def sources_resource() -> dict[str, object]:
     mime_type="application/json",
 )
 async def health_resource() -> dict[str, object]:
-    return await get_source_health()
+    healths = await get_health()
+    return {"sources": [h.model_dump(mode="json") for h in healths]}
 
 
 @mcp.resource(

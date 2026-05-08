@@ -1,7 +1,8 @@
 """Fetcher for Hacker News stories mentioning Anthropic/Claude."""
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Literal, cast
 
 from ..http import get_client
 from ..models import Category, NewsItem, Source
@@ -14,7 +15,7 @@ _URL = (
 _MIN_POINTS = 10
 
 
-def _importance(points: int) -> int:
+def _importance(points: int) -> Literal[1, 2, 3]:
     if points > 500:
         return 3
     if points > 100:
@@ -24,9 +25,10 @@ def _importance(points: int) -> int:
 
 def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
     items: list[NewsItem] = []
-    for hit in data.get("hits", []):  # type: ignore[union-attr]
+    hits = cast(list[dict[str, object]], data.get("hits", []))
+    for hit in hits:
         try:
-            points = int(float(hit.get("points") or 0))  # type: ignore[arg-type]
+            points = int(float(str(hit.get("points") or 0)))
         except (ValueError, TypeError):
             points = 0
         if points < _MIN_POINTS:
@@ -39,7 +41,7 @@ def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
 
         url = str(hit.get("url") or f"https://news.ycombinator.com/item?id={obj_id}")
         try:
-            num_comments = int(float(hit.get("num_comments") or 0))  # type: ignore[arg-type]
+            num_comments = int(float(str(hit.get("num_comments") or 0)))
         except (ValueError, TypeError):
             num_comments = 0
         story_text = str(hit.get("story_text") or "")
@@ -53,7 +55,7 @@ def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
         try:
             published_at = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
         except ValueError:
-            published_at = datetime.now(tz=timezone.utc)
+            published_at = datetime.now(tz=UTC)
 
         items.append(
             NewsItem(

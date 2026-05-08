@@ -5,13 +5,16 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from time import time
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from .server import mcp
 
@@ -127,6 +130,7 @@ def _extract_scopes(claims: dict[str, Any]) -> list[str]:
 
 def create_app(config: RemoteAuthConfig | None = None) -> Starlette:
     config = config or RemoteAuthConfig.from_env()
+    mcp._session_manager = None  # noqa: SLF001
     mcp._token_verifier = OIDCJWTVerifier(config)  # noqa: SLF001
     mcp.settings.auth = AuthSettings(
         issuer_url=AnyHttpUrl(config.issuer),
@@ -138,4 +142,33 @@ def create_app(config: RemoteAuthConfig | None = None) -> Starlette:
         allowed_hosts=config.allowed_hosts,
         allowed_origins=config.allowed_origins,
     )
-    return mcp.streamable_http_app()
+    app = mcp.streamable_http_app()
+    app.add_middleware(
+        HostOriginMiddleware,
+        allowed_hosts=set(config.allowed_hosts),
+        allowed_origins=set(config.allowed_origins),
+    )
+    return app
+
+
+class HostOriginMiddleware(BaseHTTPMiddleware):
+    def __init__(
+        self,
+        app: Any,
+        *,
+        allowed_hosts: set[str],
+        allowed_origins: set[str],
+    ) -> None:
+        super().__init__(app)
+        self.allowed_hosts = allowed_hosts
+        self.allowed_origins = allowed_origins
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        host = request.headers.get("host", "").split(":", 1)[0]
+        origin = request.headers.get("origin")
+        if host and host not in self.allowed_hosts:
+            return JSONResponse({"error": "host_not_allowed"}, status_code=403)
+        if origin and origin not in self.allowed_origins:
+            return JSONResponse({"error": "origin_not_allowed"}, status_code=403)
+        response = await call_next(request)
+        return cast(Response, response)
