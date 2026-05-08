@@ -71,9 +71,7 @@ async def get_recent_updates(
         valid_keys = {s.key for s in SOURCE_REGISTRY}
         unknown = [k for k in sources if k not in valid_keys]
         if unknown:
-            return {
-                "error": f"Unknown source keys: {unknown}. Use list_sources to see valid keys."
-            }
+            return {"error": f"Unknown source keys: {unknown}. Use list_sources to see valid keys."}
 
     parsed_since: datetime | None = None
     if since:
@@ -91,9 +89,7 @@ async def get_recent_updates(
                 invalid.append(c)
         if invalid:
             valid_values = [cat.value for cat in Category]
-            return {
-                "error": f"Unknown categories: {invalid}. Valid values: {valid_values}"
-            }
+            return {"error": f"Unknown categories: {invalid}. Valid values: {valid_values}"}
         parsed_categories = valid or None
 
     items, healths = await _get_recent_updates(

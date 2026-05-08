@@ -3,10 +3,10 @@ import os
 import sqlite3
 import time
 import warnings
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Generator
 
 from .models import NewsItem, SourceHealth, SourceStatus
 
@@ -87,9 +87,7 @@ def init_db() -> None:
             )
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_items_source ON items(source_key)")
-        db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at DESC)"
-        )
+        db.execute("CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at DESC)")
         db.execute(
             "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
             (CACHE_SCHEMA_VERSION,),
@@ -102,7 +100,7 @@ def _now_ms() -> int:
 
 
 def _ms_to_dt(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+    return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
 
 
 def _dt_to_ms(dt: datetime) -> int:

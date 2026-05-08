@@ -1,5 +1,4 @@
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -25,7 +24,7 @@ def _item(id: str, url: str = "https://anthropic.com/news/test") -> NewsItem:
         source=Source.ANTHROPIC,
         source_key="anthropic-newsroom",
         category=[Category.MODELS],
-        published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        published_at=datetime(2026, 1, 1, tzinfo=UTC),
         importance=2,
     )
 
@@ -33,7 +32,6 @@ def _item(id: str, url: str = "https://anthropic.com/news/test") -> NewsItem:
 class TestDbPath:
     def test_world_readable_dir_warns(self, tmp_path: Path) -> None:
         """get_db_path() should warn when the cache directory is world-readable."""
-        import os
         import pytest
 
         pub = tmp_path / "pub_cache"
@@ -41,12 +39,13 @@ class TestDbPath:
         cache_mod.set_db_path(pub / "cache.db")
         # Clear override so get_db_path() re-runs the stat() check
         cache_mod._DB_PATH = None  # type: ignore[attr-defined]
-        try:
+        import contextlib
+
+        with contextlib.suppress(ImportError):
             import monkeypatch  # noqa: F401 — not available here; use env var approach
-        except ImportError:
-            pass
 
         import os as _os
+
         orig = _os.environ.get("XDG_CACHE_HOME")
         _os.environ["XDG_CACHE_HOME"] = str(tmp_path / "pub_cache")
         try:
@@ -59,7 +58,9 @@ class TestDbPath:
                 _os.environ["XDG_CACHE_HOME"] = orig
             cache_mod.set_db_path(tmp_path / "test_cache.db")
 
-    def test_stat_failure_does_not_crash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_stat_failure_does_not_crash(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """If stat() raises, get_db_path() should still return a path (non-fatal)."""
         import os as _os
 
@@ -90,7 +91,9 @@ class TestInit:
         import sqlite3
 
         db = sqlite3.connect(str(cache_mod.get_db_path()))
-        tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        tables = {
+            r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        }
         db.close()
         assert "source_snapshots" in tables
         assert "items" in tables
@@ -184,7 +187,7 @@ class TestSearch:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.MODELS],
-            published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            published_at=datetime(2026, 1, 1, tzinfo=UTC),
             importance=3,
         )
         cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
@@ -213,7 +216,7 @@ class TestSearch:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.MODELS],
-            published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            published_at=datetime(2026, 1, 1, tzinfo=UTC),
             importance=1,
         )
         item_b = NewsItem(
@@ -224,7 +227,7 @@ class TestSearch:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.MODELS],
-            published_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            published_at=datetime(2026, 1, 2, tzinfo=UTC),
             importance=1,
         )
         cache_mod.save_snapshot("anthropic-newsroom", [item_a, item_b], ttl_seconds=3600)
@@ -245,7 +248,7 @@ class TestSearch:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.MODELS],
-            published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            published_at=datetime(2026, 1, 1, tzinfo=UTC),
             importance=1,
         )
         item_b = NewsItem(
@@ -256,7 +259,7 @@ class TestSearch:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.MODELS],
-            published_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            published_at=datetime(2026, 1, 2, tzinfo=UTC),
             importance=1,
         )
         cache_mod.save_snapshot("anthropic-newsroom", [item_a, item_b], ttl_seconds=3600)
@@ -264,7 +267,9 @@ class TestSearch:
         # With fix:    "_special" → LIKE "%\_special%" ESCAPE '\' → literal "_special"
         #              not present in either payload → returns nothing
         results = cache_mod.search_items("_special")
-        assert results == [], f"'_special' wildcard should not match 'xspecial', got {len(results)} items"
+        assert results == [], (
+            f"'_special' wildcard should not match 'xspecial', got {len(results)} items"
+        )
 
     def test_search_respects_limit(self) -> None:
         items = [
@@ -276,7 +281,7 @@ class TestSearch:
                 source=Source.ANTHROPIC,
                 source_key="anthropic-newsroom",
                 category=[],
-                published_at=datetime(2026, 1, i + 1, tzinfo=timezone.utc),
+                published_at=datetime(2026, 1, i + 1, tzinfo=UTC),
                 importance=1,
             )
             for i in range(10)

@@ -80,9 +80,7 @@ class TestGetRecentUpdates:
             [_make_item("a2", url_clean, source_key="anthropic-docs-api")],
             ttl_seconds=3600,
         )
-        result, _ = await get_recent_updates(
-            sources=["anthropic-newsroom", "anthropic-docs-api"]
-        )
+        result, _ = await get_recent_updates(sources=["anthropic-newsroom", "anthropic-docs-api"])
         # Both canonicalize to the same URL — only one should survive
         assert len(result) == 1
 
@@ -157,9 +155,7 @@ class TestGetRecentUpdates:
 
     @pytest.mark.asyncio
     async def test_limit_respected(self):
-        items = [
-            _make_item(f"e{i}", f"https://anthropic.com/{i}") for i in range(10)
-        ]
+        items = [_make_item(f"e{i}", f"https://anthropic.com/{i}") for i in range(10)]
         cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=3600)
         result, _ = await get_recent_updates(sources=["anthropic-newsroom"], limit=3)
         assert len(result) == 3

@@ -1,9 +1,10 @@
 import json
+from datetime import UTC
 from pathlib import Path
 
 import pytest
 
-from anthropic_news_mcp.fetchers.hackernews import _parse_hn, _importance
+from anthropic_news_mcp.fetchers.hackernews import _importance, _parse_hn
 from anthropic_news_mcp.fetchers.reddit import _parse_subreddit
 from anthropic_news_mcp.models import Category, Source
 
@@ -86,7 +87,7 @@ class TestHackerNews:
             assert item.id.startswith("hn-")
 
     def test_sorted_newest_first(self, items):
-        for a, b in zip(items, items[1:]):
+        for a, b in zip(items, items[1:], strict=False):
             assert a.published_at >= b.published_at
 
 
@@ -149,8 +150,7 @@ class TestReddit:
 
     def test_invalid_timestamp_falls_back_to_now(self):
         """Malformed created_utc must not crash the parser."""
-        import math
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         data = {
             "data": {
@@ -172,9 +172,9 @@ class TestReddit:
                 ]
             }
         }
-        before = datetime.now(tz=timezone.utc)
+        before = datetime.now(tz=UTC)
         items = _parse_subreddit(data, "ClaudeAI")
-        after = datetime.now(tz=timezone.utc)
+        after = datetime.now(tz=UTC)
         assert len(items) == 1
         assert before <= items[0].published_at <= after
 

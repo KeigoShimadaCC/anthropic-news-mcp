@@ -2,7 +2,7 @@
 
 import asyncio
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 from . import cache
@@ -15,11 +15,7 @@ _UTM_RE = re.compile(r"utm_[a-z_]+", re.IGNORECASE)
 def _canonicalize_url(url: str) -> str:
     """Normalize URL for dedup: drop fragments, utm_* params, decode and sort remaining params."""
     parsed = urlparse(url)
-    params = [
-        (unquote(k), unquote(v))
-        for k, v in parse_qsl(parsed.query)
-        if not _UTM_RE.match(k)
-    ]
+    params = [(unquote(k), unquote(v)) for k, v in parse_qsl(parsed.query) if not _UTM_RE.match(k)]
     params.sort()
     normalized = parsed._replace(fragment="", query=urlencode(params))
     return urlunparse(normalized)
@@ -55,7 +51,7 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
         )
         health = cache.get_snapshot(config.key)
         if health is None:
-            raise RuntimeError(f"Cache write for {config.key!r} did not persist")
+            raise RuntimeError(f"Cache write for {config.key!r} did not persist") from exc
         return cached_items, health
 
 
@@ -102,9 +98,7 @@ async def get_recent_updates(
             # Mark as cache status (not live)
             health = health.model_copy(update={"status": SourceStatus.CACHE})
         else:
-            from datetime import timezone
-
-            now = datetime.now(tz=timezone.utc)
+            now = datetime.now(tz=UTC)
             health = SourceHealth(
                 key=config.key,
                 status=SourceStatus.CACHE,
@@ -144,11 +138,10 @@ async def search_updates(query: str, limit: int = 10) -> list[NewsItem]:
 
 async def get_health() -> list[SourceHealth]:
     """Return health for all configured sources, with placeholders for uncached ones."""
-    from datetime import timezone
 
     cached = {h.key: h for h in cache.get_all_snapshots()}
     healths: list[SourceHealth] = []
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     for config in SOURCE_REGISTRY:
         if config.key in cached:
             healths.append(cached[config.key])

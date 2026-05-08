@@ -78,9 +78,7 @@ async def test_list_sources_returns_all() -> None:
 @pytest.mark.asyncio
 async def test_get_recent_updates_cached_items() -> None:
     _seed("anthropic-newsroom", n=3)
-    data = await _call(
-        "get_recent_updates", {"sources": ["anthropic-newsroom"], "limit": 10}
-    )
+    data = await _call("get_recent_updates", {"sources": ["anthropic-newsroom"], "limit": 10})
     assert len(data["items"]) == 3
     assert "sources" in data
 
@@ -157,9 +155,7 @@ async def test_get_recent_updates_since_filter() -> None:
 @pytest.mark.asyncio
 async def test_get_recent_updates_limit() -> None:
     _seed("anthropic-newsroom", n=5)
-    data = await _call(
-        "get_recent_updates", {"sources": ["anthropic-newsroom"], "limit": 2}
-    )
+    data = await _call("get_recent_updates", {"sources": ["anthropic-newsroom"], "limit": 2})
     assert len(data["items"]) == 2
 
 

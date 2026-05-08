@@ -2,7 +2,7 @@
 
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..http import get_client
 from ..models import Category, NewsItem, Source
@@ -44,11 +44,9 @@ def _parse_releases(data: list[dict[str, object]], repo: str) -> list[NewsItem]:
         body = _strip_html(str(release.get("body") or ""))[:400]
         published_raw = release.get("published_at") or release.get("created_at", "")
         try:
-            published_at = datetime.fromisoformat(
-                str(published_raw).replace("Z", "+00:00")
-            )
+            published_at = datetime.fromisoformat(str(published_raw).replace("Z", "+00:00"))
         except ValueError:
-            published_at = datetime.now(tz=timezone.utc)
+            published_at = datetime.now(tz=UTC)
 
         items.append(
             NewsItem(
@@ -86,9 +84,7 @@ class GitHubReleasesFetcher(Fetcher):
         all_items: list[NewsItem] = []
         async with get_client(headers=headers) as client:
             for repo in _REPOS:
-                resp = await client.get(
-                    f"https://api.github.com/repos/{repo}/releases?per_page=5"
-                )
+                resp = await client.get(f"https://api.github.com/repos/{repo}/releases?per_page=5")
                 if resp.status_code == 404:
                     continue
                 resp.raise_for_status()

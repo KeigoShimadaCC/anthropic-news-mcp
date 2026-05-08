@@ -35,9 +35,7 @@ def _parse_date(text: str) -> datetime:
     if not m:
         return datetime.now(tz=UTC)
     try:
-        return datetime.strptime(m.group(0).replace(",", ""), "%b %d %Y").replace(
-            tzinfo=UTC
-        )
+        return datetime.strptime(m.group(0).replace(",", ""), "%b %d %Y").replace(tzinfo=UTC)
     except ValueError:
         return datetime.now(tz=UTC)
 

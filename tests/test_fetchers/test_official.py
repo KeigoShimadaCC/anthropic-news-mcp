@@ -22,15 +22,9 @@ def test_status_operational_has_no_rollup_and_maps_impacts() -> None:
     )
     assert len(items) == 3
     assert all(item.category == [Category.OPS] for item in items)
-    assert {item.title: item.importance for item in items}[
-        "Elevated API errors"
-    ] == 3
-    assert {item.title: item.importance for item in items}[
-        "Minor dashboard delay"
-    ] == 2
-    assert {item.title: item.importance for item in items}[
-        "Scheduled maintenance"
-    ] == 1
+    assert {item.title: item.importance for item in items}["Elevated API errors"] == 3
+    assert {item.title: item.importance for item in items}["Minor dashboard delay"] == 2
+    assert {item.title: item.importance for item in items}["Scheduled maintenance"] == 1
 
 
 def test_status_non_operational_adds_rollup() -> None:
@@ -157,7 +151,5 @@ def test_business_and_trust_filters_rekey_official_items() -> None:
         terms=_TRUST_TERMS,
         categories=[Category.POLICY],
     )
-    assert [item.source_key for item in business] == [
-        "anthropic-business-infrastructure"
-    ]
+    assert [item.source_key for item in business] == ["anthropic-business-infrastructure"]
     assert [item.source_key for item in trust] == ["anthropic-trust-policy"]

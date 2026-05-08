@@ -2,7 +2,7 @@
 
 import html as html_lib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..http import get_client
 from ..models import Category, NewsItem, Source
@@ -47,16 +47,13 @@ def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
             num_comments = 0
         selftext = _decode(_strip_html(str(post.get("selftext") or "")))
 
-        if selftext.strip():
-            summary = selftext[:300]
-        else:
-            summary = f"{ups} upvotes · {num_comments} comments"
+        summary = selftext[:300] if selftext.strip() else f"{ups} upvotes · {num_comments} comments"
 
         created_utc = float(post.get("created_utc") or 0)  # type: ignore[arg-type]
         try:
-            published_at = datetime.fromtimestamp(created_utc, tz=timezone.utc)
+            published_at = datetime.fromtimestamp(created_utc, tz=UTC)
         except (ValueError, OSError, OverflowError):
-            published_at = datetime.now(tz=timezone.utc)
+            published_at = datetime.now(tz=UTC)
 
         permalink = str(post.get("permalink") or "")
         url = f"https://reddit.com{permalink}"
@@ -88,9 +85,7 @@ class RedditFetcher(Fetcher):
 
         async with get_client(headers=headers) as client:
             for sub in _SUBREDDITS:
-                resp = await client.get(
-                    f"https://www.reddit.com/r/{sub}/hot.json?limit=10"
-                )
+                resp = await client.get(f"https://www.reddit.com/r/{sub}/hot.json?limit=10")
                 if resp.status_code in (403, 429):
                     continue
                 resp.raise_for_status()

@@ -205,7 +205,11 @@ def _build_tool_schemas() -> list[dict]:  # type: ignore[type-arg]
 
     tools = []
     for tool in mcp._tool_manager._tools.values():  # type: ignore[attr-defined]
-        schema = tool.fn_metadata.arg_model.model_json_schema() if hasattr(tool.fn_metadata, "arg_model") else {}
+        schema = (
+            tool.fn_metadata.arg_model.model_json_schema()
+            if hasattr(tool.fn_metadata, "arg_model")
+            else {}
+        )
         tools.append(
             {
                 "name": tool.name,
@@ -226,53 +230,133 @@ def _seed_cache() -> None:
     now = datetime(2026, 5, 8, tzinfo=UTC)
     seed_items = {
         "anthropic-newsroom": [
-            ("seed-news-1", "Claude model update", [Category.MODELS], "Latest Claude announcement."),
-            ("seed-news-2", "Responsible Scaling Policy update", [Category.POLICY], "RSP safety update."),
+            (
+                "seed-news-1",
+                "Claude model update",
+                [Category.MODELS],
+                "Latest Claude announcement.",
+            ),
+            (
+                "seed-news-2",
+                "Responsible Scaling Policy update",
+                [Category.POLICY],
+                "RSP safety update.",
+            ),
         ],
         "anthropic-status": [
-            ("seed-status-1", "Claude Status: All Systems Operational", [Category.OPS], "No active incidents."),
+            (
+                "seed-status-1",
+                "Claude Status: All Systems Operational",
+                [Category.OPS],
+                "No active incidents.",
+            ),
         ],
         "anthropic-research": [
-            ("seed-research-1", "Research paper on model behavior", [Category.RESEARCH], "Anthropic research publication."),
+            (
+                "seed-research-1",
+                "Research paper on model behavior",
+                [Category.RESEARCH],
+                "Anthropic research publication.",
+            ),
         ],
         "anthropic-engineering": [
-            ("seed-eng-1", "Building effective agents", [Category.ENGINEERING], "Engineering post about agents."),
+            (
+                "seed-eng-1",
+                "Building effective agents",
+                [Category.ENGINEERING],
+                "Engineering post about agents.",
+            ),
         ],
         "anthropic-docs-claude-code": [
-            ("seed-code-1", "Claude Code changelog", [Category.CLAUDE_CODE], "Claude Code release shipped this week."),
+            (
+                "seed-code-1",
+                "Claude Code changelog",
+                [Category.CLAUDE_CODE],
+                "Claude Code release shipped this week.",
+            ),
         ],
         "anthropic-docs-api": [
-            ("seed-api-1", "API Release Notes: Sonnet 4.5", [Category.MODELS], "API model release notes."),
+            (
+                "seed-api-1",
+                "API Release Notes: Sonnet 4.5",
+                [Category.MODELS],
+                "API model release notes.",
+            ),
         ],
         "anthropic-docs-claude-apps": [
-            ("seed-apps-1", "Claude Apps Release Notes", [Category.MODELS], "Desktop and mobile app updates."),
+            (
+                "seed-apps-1",
+                "Claude Apps Release Notes",
+                [Category.MODELS],
+                "Desktop and mobile app updates.",
+            ),
         ],
         "anthropic-docs-system-prompts": [
-            ("seed-prompts-1", "System Prompt Release Notes", [Category.POLICY], "System prompt transparency changes."),
+            (
+                "seed-prompts-1",
+                "System Prompt Release Notes",
+                [Category.POLICY],
+                "System prompt transparency changes.",
+            ),
         ],
         "anthropic-support-release-notes": [
-            ("seed-support-1", "Claude Help Center Release Notes", [Category.MODELS], "Claude app release notes."),
+            (
+                "seed-support-1",
+                "Claude Help Center Release Notes",
+                [Category.MODELS],
+                "Claude app release notes.",
+            ),
         ],
         "anthropic-economic-index": [
-            ("seed-econ-1", "Anthropic Economic Index", [Category.ECONOMICS, Category.RESEARCH], "Economic research on AI at work."),
+            (
+                "seed-econ-1",
+                "Anthropic Economic Index",
+                [Category.ECONOMICS, Category.RESEARCH],
+                "Economic research on AI at work.",
+            ),
         ],
         "anthropic-business-infrastructure": [
-            ("seed-biz-1", "Compute partnership expansion", [Category.BUSINESS], "Business infrastructure and enterprise demand."),
+            (
+                "seed-biz-1",
+                "Compute partnership expansion",
+                [Category.BUSINESS],
+                "Business infrastructure and enterprise demand.",
+            ),
         ],
         "anthropic-trust-policy": [
-            ("seed-trust-1", "Trust and safety transparency update", [Category.POLICY], "Safeguards, red-team, and policy update."),
+            (
+                "seed-trust-1",
+                "Trust and safety transparency update",
+                [Category.POLICY],
+                "Safeguards, red-team, and policy update.",
+            ),
         ],
         "anthropic-github-releases": [
             ("seed-gh-1", "Python SDK release", [Category.MODELS], "Anthropic Python SDK release."),
         ],
         "anthropic-github-events": [
-            ("seed-ghe-1", "New anthropics repository", [Category.CLAUDE_CODE], "GitHub org event."),
+            (
+                "seed-ghe-1",
+                "New anthropics repository",
+                [Category.CLAUDE_CODE],
+                "GitHub org event.",
+            ),
         ],
         "hn-anthropic": [
-            ("seed-hn-1", "HN discussion about Anthropic", [Category.COMMUNITY], "Hacker News story with points."),
+            (
+                "seed-hn-1",
+                "HN discussion about Anthropic",
+                [Category.COMMUNITY],
+                "Hacker News story with points.",
+            ),
         ],
         "reddit-claude": [
-            ("seed-reddit-1", "r/ClaudeAI community post", [Category.COMMUNITY], "Reddit community discussion."),
+            (
+                "seed-reddit-1",
+                "r/ClaudeAI community post",
+                [Category.COMMUNITY],
+                "Reddit community discussion.",
+            ),
         ],
     }
     for config in SOURCE_REGISTRY:
@@ -338,9 +422,9 @@ async def run(ids: list[str] | None = None, seed_cache: bool = False) -> None:
     passed = mean_score >= 5.0
 
     print()
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Mean score: {mean_score:.2f}/6.0  |  {'PASS ✓' if passed else 'FAIL ✗'}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Write results
     ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")

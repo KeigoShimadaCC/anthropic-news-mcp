@@ -88,9 +88,7 @@ def _parse_date(text: str, default_day: int = 1) -> datetime:
         day = m.group(3)
         year = m.group(4)
         try:
-            return datetime.strptime(f"{month} {day} {year}", "%b %d %Y").replace(
-                tzinfo=UTC
-            )
+            return datetime.strptime(f"{month} {day} {year}", "%b %d %Y").replace(tzinfo=UTC)
         except ValueError:
             pass
 
@@ -99,9 +97,9 @@ def _parse_date(text: str, default_day: int = 1) -> datetime:
         month = section.group(1)[:3]
         year = section.group(2)
         try:
-            return datetime.strptime(
-                f"{month} {default_day} {year}", "%b %d %Y"
-            ).replace(tzinfo=UTC)
+            return datetime.strptime(f"{month} {default_day} {year}", "%b %d %Y").replace(
+                tzinfo=UTC
+            )
         except ValueError:
             pass
 
@@ -171,9 +169,7 @@ def parse_anthropic_listing_html(
         if not title:
             continue
 
-        summary_node = next(
-            (c for c in a.iter() if c.tag == "p" and c.text(strip=True)), None
-        )
+        summary_node = next((c for c in a.iter() if c.tag == "p" and c.text(strip=True)), None)
         summary = summary_node.text(strip=True)[:400] if summary_node else ""
         categories = _categories_from_text(text, default_categories)
 
@@ -563,11 +559,7 @@ def _status_item(payload: dict[str, Any], *, source_key: str, kind: str) -> News
         or payload.get("created_at")
         or payload.get("updated_at")
     )
-    published_at = (
-        _parse_iso_datetime(str(timestamp))
-        if timestamp
-        else datetime.now(tz=UTC)
-    )
+    published_at = _parse_iso_datetime(str(timestamp)) if timestamp else datetime.now(tz=UTC)
     status = payload.get("status", "")
     summary = payload.get("impact_override") or payload.get("body") or status or ""
     url = payload.get("shortlink") or payload.get("url") or "https://status.claude.com/"

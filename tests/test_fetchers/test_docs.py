@@ -85,7 +85,7 @@ class TestApiDocs:
             assert item.published_at.year >= 2025
 
     def test_sorted_newest_first(self, items):
-        for a, b in zip(items, items[1:]):
+        for a, b in zip(items, items[1:], strict=False):
             assert a.published_at >= b.published_at
 
     def test_ids_are_stable(self):

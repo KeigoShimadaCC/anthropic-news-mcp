@@ -78,9 +78,7 @@ class TestGitHubReleases:
         assert Category.MODELS in items[0].category
 
     @pytest.mark.asyncio
-    async def test_fetch_without_github_token_uses_unauthenticated_requests(
-        self, monkeypatch
-    ):
+    async def test_fetch_without_github_token_uses_unauthenticated_requests(self, monkeypatch):
         calls = []
 
         class FakeResponse:
@@ -180,5 +178,5 @@ class TestGitHubOrgEvents:
             assert item.source_key == "anthropic-github-events"
 
     def test_sorted_newest_first(self, items):
-        for a, b in zip(items, items[1:]):
+        for a, b in zip(items, items[1:], strict=False):
             assert a.published_at >= b.published_at

@@ -1,7 +1,7 @@
 """Fetcher for Anthropic API release notes (platform.claude.com/docs)."""
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from selectolax.parser import HTMLParser
 
@@ -11,7 +11,9 @@ from .base import Fetcher
 
 _URL = "https://platform.claude.com/docs/en/release-notes/overview"
 _MONTHS = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
-_LONG_MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
+_LONG_MONTHS = (
+    "January|February|March|April|May|June|July|August|September|October|November|December"
+)
 _DATE_RE = re.compile(
     rf"(?:({_LONG_MONTHS})|({_MONTHS}))\s+(\d{{1,2}}),?\s+(\d{{4}})",
     re.IGNORECASE,
@@ -21,16 +23,14 @@ _DATE_RE = re.compile(
 def _parse_date(text: str) -> datetime:
     m = _DATE_RE.search(text)
     if not m:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
     month_str = (m.group(1) or m.group(2)).strip()[:3]
     day = m.group(3)
     year = m.group(4)
     try:
-        return datetime.strptime(f"{month_str} {day} {year}", "%b %d %Y").replace(
-            tzinfo=timezone.utc
-        )
+        return datetime.strptime(f"{month_str} {day} {year}", "%b %d %Y").replace(tzinfo=UTC)
     except ValueError:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
 
 
 def _slugify(text: str) -> str:

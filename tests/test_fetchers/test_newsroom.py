@@ -47,7 +47,6 @@ def test_all_items_have_urls(items):
 
 
 def test_all_items_have_dates(items):
-    from datetime import datetime, timezone
 
     for item in items:
         assert item.published_at.tzinfo is not None
@@ -66,7 +65,7 @@ def test_no_duplicate_ids(items):
 
 
 def test_sorted_newest_first(items):
-    for a, b in zip(items, items[1:]):
+    for a, b in zip(items, items[1:], strict=False):
         assert a.published_at >= b.published_at
 
 
