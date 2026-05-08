@@ -1,8 +1,8 @@
 # anthropic-news-mcp
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that aggregates
-Anthropic news, Claude Code changelogs, model releases, and community signals into a single
-tool surface for LLM clients like Claude Desktop and Cursor.
+Anthropic news, Claude Code changelogs, model releases, and community signals into a
+research-oriented MCP surface for LLM clients like Claude Desktop and Cursor.
 
 [![CI](https://github.com/KeigoShimadaCC/anthropic-news-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/KeigoShimadaCC/anthropic-news-mcp/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -142,7 +142,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The four tools will appear automatically.
+Restart Claude Desktop. The MCP tools will appear automatically.
 
 ### Cursor
 
@@ -226,7 +226,7 @@ Claude Desktop / Cursor
         ├─ ping
         ├─ list_sources
         ├─ get_recent_updates ──► async gather across all sources
-        ├─ search_updates      ──► SQLite FTS (substring)
+        ├─ search_updates      ──► SQLite substring search
         ├─ research tools      ──► details, evidence, timelines, sessions
         ├─ get_source_health
         ├─ resources
