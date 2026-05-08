@@ -1,11 +1,11 @@
 """Fetcher for recent GitHub issues and pull requests from selected repos."""
 
 import os
-from datetime import UTC, datetime
+from datetime import datetime
 from urllib.parse import quote_plus
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _REPOS = [
@@ -40,7 +40,7 @@ def _parse_issue_search(data: dict[str, object]) -> list[NewsItem]:
         try:
             published_at = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
         except ValueError:
-            published_at = datetime.now(tz=UTC)
+            published_at = None
         body = str(raw.get("body") or "")[:400]
         items.append(
             NewsItem(
@@ -52,6 +52,7 @@ def _parse_issue_search(data: dict[str, object]) -> list[NewsItem]:
                 source_key=GitHubIssuesPullsFetcher.source_key,
                 category=[Category.CLAUDE_CODE, Category.ENGINEERING],
                 published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=2 if is_pr else 1,
                 tags=["github", "pull-request" if is_pr else "issue", *labels[:8]],
                 author=str((raw.get("user") or {}).get("login", ""))
@@ -59,7 +60,7 @@ def _parse_issue_search(data: dict[str, object]) -> list[NewsItem]:
                 else None,
             )
         )
-    items.sort(key=lambda item: item.published_at, reverse=True)
+    items.sort(key=lambda item: item.sort_at or item.discovered_at, reverse=True)
     return items
 
 

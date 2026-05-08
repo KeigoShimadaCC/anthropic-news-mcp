@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from selectolax.parser import HTMLParser
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _URL = "https://platform.claude.com/docs/en/release-notes/overview"
@@ -20,17 +20,17 @@ _DATE_RE = re.compile(
 )
 
 
-def _parse_date(text: str) -> datetime:
+def _parse_date(text: str) -> datetime | None:
     m = _DATE_RE.search(text)
     if not m:
-        return datetime.now(tz=UTC)
+        return None
     month_str = (m.group(1) or m.group(2)).strip()[:3]
     day = m.group(3)
     year = m.group(4)
     try:
         return datetime.strptime(f"{month_str} {day} {year}", "%b %d %Y").replace(tzinfo=UTC)
     except ValueError:
-        return datetime.now(tz=UTC)
+        return None
 
 
 def _slugify(text: str) -> str:
@@ -80,13 +80,14 @@ def _parse_api_docs_html(html: str, limit: int = 10) -> list[NewsItem]:
                 source_key=ApiDocsFetcher.source_key,
                 category=[Category.MODELS],
                 published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=2,
             )
         )
         if len(items) >= limit:
             break
 
-    items.sort(key=lambda x: x.published_at, reverse=True)
+    items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
     return items[:limit]
 
 

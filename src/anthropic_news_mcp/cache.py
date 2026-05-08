@@ -1,25 +1,28 @@
 import json
 import os
+import re
 import sqlite3
 import time
 import warnings
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
 from .models import (
     ContentDetail,
     EvidenceExcerpt,
+    EvidenceTier,
     NewsItem,
     ResearchNote,
     ResearchReport,
     ResearchSession,
     SourceHealth,
     SourceStatus,
+    SourceType,
 )
 
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
 
 _DB_PATH: Path | None = None
 _db_initialized: bool = False
@@ -107,6 +110,19 @@ def init_db() -> None:
                 payload_json  TEXT NOT NULL
             )
         """)
+        with suppress(sqlite3.OperationalError):
+            db.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+                    id UNINDEXED,
+                    title,
+                    summary,
+                    tags,
+                    source_key,
+                    source_type,
+                    evidence_tier,
+                    tokenize='unicode61'
+                )
+            """)
         db.execute("""
             CREATE TABLE IF NOT EXISTS content_details (
                 item_id         TEXT PRIMARY KEY,
@@ -183,9 +199,8 @@ def init_db() -> None:
         db.execute("CREATE INDEX IF NOT EXISTS idx_history_item ON item_history(item_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_notes_session ON research_notes(session_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_reports_session ON research_reports(session_id)")
-        db.execute(
-            "INSERT OR IGNORE INTO schema_version (version) VALUES (?)", (CACHE_SCHEMA_VERSION,)
-        )
+        db.execute("DELETE FROM schema_version")
+        db.execute("INSERT INTO schema_version (version) VALUES (?)", (CACHE_SCHEMA_VERSION,))
         db.commit()
 
 
@@ -199,6 +214,34 @@ def _ms_to_dt(ms: int) -> datetime:
 
 def _dt_to_ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
+
+
+def _item_sort_ms(item: NewsItem) -> int:
+    return _dt_to_ms(item.sort_at or item.published_at or item.discovered_at)
+
+
+def _source_metadata(source_key: str) -> tuple[SourceType, EvidenceTier, bool]:
+    from .config import SOURCE_REGISTRY
+
+    config = next((source for source in SOURCE_REGISTRY if source.key == source_key), None)
+    if config is None:
+        return SourceType.OFFICIAL, EvidenceTier.HIGH, True
+    return (
+        config.source_type,
+        config.evidence_tier,
+        config.source_type in {SourceType.OFFICIAL, SourceType.DOCS},
+    )
+
+
+def _enrich_item(item: NewsItem) -> NewsItem:
+    source_type, evidence_tier, is_official = _source_metadata(item.source_key)
+    return item.model_copy(
+        update={
+            "source_type": source_type,
+            "evidence_tier": evidence_tier,
+            "is_official": is_official,
+        }
+    )
 
 
 def get_snapshot(source_key: str) -> SourceHealth | None:
@@ -243,7 +286,7 @@ def get_cached_items(source_key: str) -> list[NewsItem]:
     if row is None:
         return []
     raw: list[dict[str, object]] = json.loads(row["items_json"])
-    return [NewsItem.model_validate(item) for item in raw]
+    return [_enrich_item(NewsItem.model_validate(item)) for item in raw]
 
 
 def save_snapshot(
@@ -255,6 +298,7 @@ def save_snapshot(
 ) -> None:
     """Persist a fetch result to cache."""
     init_db()
+    items = [_enrich_item(item) for item in items]
     now = _now_ms()
     expires = now + ttl_seconds * 1000
     items_json = json.dumps([item.model_dump(mode="json") for item in items])
@@ -304,7 +348,7 @@ def save_snapshot(
                 item.id,
                 item.source_key,
                 str(item.url),
-                _dt_to_ms(item.published_at),
+                _item_sort_ms(item),
                 item.model_dump_json(),
             )
             for item in items
@@ -313,6 +357,7 @@ def save_snapshot(
             "INSERT OR REPLACE INTO items (id, source_key, url, published_at, payload_json) VALUES (?, ?, ?, ?, ?)",
             rows,
         )
+        _sync_items_fts(db, source_key, items)
         # Batch-fetch existing history rows and content hashes for all items at once.
         item_ids = [item.id for item in items]
         placeholders = ",".join("?" * len(item_ids))
@@ -373,14 +418,14 @@ def get_item(item_id: str) -> NewsItem | None:
         row = db.execute("SELECT payload_json FROM items WHERE id = ?", (item_id,)).fetchone()
     if row is None:
         return None
-    return NewsItem.model_validate_json(row["payload_json"])
+    return _enrich_item(NewsItem.model_validate_json(row["payload_json"]))
 
 
 def get_all_items() -> list[NewsItem]:
     init_db()
     with _conn() as db:
         rows = db.execute("SELECT payload_json FROM items ORDER BY published_at DESC").fetchall()
-    return [NewsItem.model_validate_json(row["payload_json"]) for row in rows]
+    return [_enrich_item(NewsItem.model_validate_json(row["payload_json"])) for row in rows]
 
 
 def save_content_detail(detail: ContentDetail) -> None:
@@ -725,11 +770,40 @@ def get_all_snapshots() -> list[SourceHealth]:
     ]
 
 
-def search_items(query: str, limit: int = 10) -> list[NewsItem]:
-    """Case-insensitive substring search across all cached item fields."""
-    init_db()
-    # Escape LIKE metacharacters so user input is treated as a literal substring,
-    # not a wildcard pattern. Without this, query="_" matches every row.
+def _sync_items_fts(db: sqlite3.Connection, source_key: str, items: list[NewsItem]) -> None:
+    try:
+        db.execute("DELETE FROM items_fts WHERE source_key = ?", (source_key,))
+        db.executemany(
+            """
+            INSERT INTO items_fts
+                (id, title, summary, tags, source_key, source_type, evidence_tier)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    item.id,
+                    item.title,
+                    item.summary,
+                    " ".join(item.tags),
+                    item.source_key,
+                    item.source_type.value,
+                    item.evidence_tier.value,
+                )
+                for item in items
+            ],
+        )
+    except sqlite3.OperationalError:
+        return
+
+
+def _fts_query(query: str) -> str:
+    tokens = re.findall(r"\w+", query.lower())
+    if not tokens:
+        return '""'
+    return " ".join(f"{token}*" for token in tokens[:8])
+
+
+def _literal_search_items(query: str, limit: int) -> list[NewsItem]:
     escaped = query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     pattern = f"%{escaped}%"
     with _conn() as db:
@@ -742,4 +816,27 @@ def search_items(query: str, limit: int = 10) -> list[NewsItem]:
             """,
             (pattern, limit),
         ).fetchall()
-    return [NewsItem.model_validate_json(row["payload_json"]) for row in rows]
+    return [_enrich_item(NewsItem.model_validate_json(row["payload_json"])) for row in rows]
+
+
+def search_items(query: str, limit: int = 10) -> list[NewsItem]:
+    """Ranked search across cached item fields and source metadata."""
+    init_db()
+    try:
+        with _conn() as db:
+            rows = db.execute(
+                """
+                SELECT items.payload_json
+                FROM items_fts
+                JOIN items ON items.id = items_fts.id
+                WHERE items_fts MATCH ?
+                ORDER BY
+                    bm25(items_fts, 4.0, 2.5, 1.5, 1.0, 0.5, 0.5),
+                    items.published_at DESC
+                LIMIT ?
+                """,
+                (_fts_query(query), limit),
+            ).fetchall()
+        return [_enrich_item(NewsItem.model_validate_json(row["payload_json"])) for row in rows]
+    except sqlite3.OperationalError:
+        return _literal_search_items(query, limit)

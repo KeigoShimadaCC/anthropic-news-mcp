@@ -1,11 +1,11 @@
 """Fetcher for Hacker News stories mentioning Anthropic/Claude."""
 
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal, cast
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _URL = (
@@ -55,7 +55,7 @@ def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
         try:
             published_at = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
         except ValueError:
-            published_at = datetime.now(tz=UTC)
+            published_at = None
 
         items.append(
             NewsItem(
@@ -67,12 +67,13 @@ def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
                 source_key=HackerNewsFetcher.source_key,
                 category=[Category.COMMUNITY],
                 published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=_importance(points),
                 author=str(hit.get("author") or ""),
             )
         )
 
-    items.sort(key=lambda x: x.published_at, reverse=True)
+    items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
     return items
 
 

@@ -1,5 +1,4 @@
 import json
-from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -148,10 +147,8 @@ class TestReddit:
             if item.author:
                 assert item.author.startswith("u/")
 
-    def test_invalid_timestamp_falls_back_to_now(self):
-        """Malformed created_utc must not crash the parser."""
-        from datetime import datetime
-
+    def test_invalid_timestamp_has_unknown_published_date(self):
+        """Malformed created_utc must not crash or synthesize a published date."""
         data = {
             "data": {
                 "children": [
@@ -172,11 +169,10 @@ class TestReddit:
                 ]
             }
         }
-        before = datetime.now(tz=UTC)
         items = _parse_subreddit(data, "ClaudeAI")
-        after = datetime.now(tz=UTC)
         assert len(items) == 1
-        assert before <= items[0].published_at <= after
+        assert items[0].published_at is None
+        assert items[0].sort_at is not None
 
     def test_non_numeric_ups_falls_back_to_zero(self):
         """Non-numeric ups/num_comments must not crash the parser."""

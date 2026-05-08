@@ -2,11 +2,11 @@
 
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import cast
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
         try:
             created_at = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
         except ValueError:
-            created_at = datetime.now(tz=UTC)
+            created_at = None
 
         if event_type == "ReleaseEvent":
             action = str(payload.get("action", ""))
@@ -52,6 +52,7 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
                     source_key=GitHubOrgEventsFetcher.source_key,
                     category=[Category.CLAUDE_CODE],
                     published_at=created_at,
+                    date_confidence=DateConfidence.EXACT if created_at else DateConfidence.UNKNOWN,
                     importance=2,
                 )
             )
@@ -74,11 +75,12 @@ def _parse_events(data: list[dict[str, object]]) -> list[NewsItem]:
                     source_key=GitHubOrgEventsFetcher.source_key,
                     category=[Category.CLAUDE_CODE],
                     published_at=created_at,
+                    date_confidence=DateConfidence.EXACT if created_at else DateConfidence.UNKNOWN,
                     importance=2,
                 )
             )
 
-    items.sort(key=lambda x: x.published_at, reverse=True)
+    items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
     return items
 
 

@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, cast
+from uuid import uuid4
 
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
@@ -35,6 +37,8 @@ class RemoteAuthConfig:
     allowed_hosts: list[str]
     allowed_origins: list[str]
     resource_server_url: str
+    rate_limit_per_minute: int = 120
+    rate_limit_burst: int = 30
 
     @classmethod
     def from_env(cls) -> RemoteAuthConfig:
@@ -44,6 +48,10 @@ class RemoteAuthConfig:
         allowed_origins = _csv_env("ANTHROPIC_NEWS_MCP_ALLOWED_ORIGINS")
         required_scopes = _csv_env("ANTHROPIC_NEWS_MCP_REQUIRED_SCOPES")
         resource_server_url = os.environ.get("ANTHROPIC_NEWS_MCP_RESOURCE_SERVER_URL", "").strip()
+        rate_limit_per_minute = int(
+            os.environ.get("ANTHROPIC_NEWS_MCP_RATE_LIMIT_PER_MINUTE", "120")
+        )
+        rate_limit_burst = int(os.environ.get("ANTHROPIC_NEWS_MCP_RATE_LIMIT_BURST", "30"))
 
         missing = [
             name
@@ -71,6 +79,8 @@ class RemoteAuthConfig:
             allowed_hosts=allowed_hosts,
             allowed_origins=allowed_origins,
             resource_server_url=resource_server_url,
+            rate_limit_per_minute=max(rate_limit_per_minute, 1),
+            rate_limit_burst=max(rate_limit_burst, 1),
         )
 
 
@@ -159,7 +169,79 @@ def create_app(config: RemoteAuthConfig | None = None) -> Starlette:
         allowed_hosts=set(config.allowed_hosts),
         allowed_origins=set(config.allowed_origins),
     )
+    app.add_middleware(
+        RequestLogRateLimitMiddleware,
+        rate_limit_per_minute=config.rate_limit_per_minute,
+        rate_limit_burst=config.rate_limit_burst,
+    )
     return app
+
+
+class _TokenBucket:
+    def __init__(self, *, rate_per_minute: int, burst: int) -> None:
+        self.rate_per_second = rate_per_minute / 60
+        self.burst = float(burst)
+        self.tokens: dict[str, tuple[float, float]] = {}
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        tokens, updated_at = self.tokens.get(key, (self.burst, now))
+        tokens = min(self.burst, tokens + (now - updated_at) * self.rate_per_second)
+        if tokens < 1:
+            self.tokens[key] = (tokens, now)
+            return False
+        self.tokens[key] = (tokens - 1, now)
+        return True
+
+
+class RequestLogRateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(
+        self,
+        app: Any,
+        *,
+        rate_limit_per_minute: int,
+        rate_limit_burst: int,
+    ) -> None:
+        super().__init__(app)
+        self.bucket = _TokenBucket(
+            rate_per_minute=rate_limit_per_minute,
+            burst=rate_limit_burst,
+        )
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        request_id = request.headers.get("x-request-id") or uuid4().hex
+        client = request.client.host if request.client else "unknown"
+        if not self.bucket.allow(client):
+            _log.info(
+                "remote_request",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": 429,
+                    "client": client,
+                },
+            )
+            return JSONResponse(
+                {"error": {"code": "rate_limited", "message": "Too many requests.", "details": {}}},
+                status_code=429,
+                headers={"x-request-id": request_id},
+            )
+        started = time.perf_counter()
+        response = cast(Response, await call_next(request))
+        response.headers["x-request-id"] = request_id
+        _log.info(
+            "remote_request",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": int((time.perf_counter() - started) * 1000),
+                "client": client,
+            },
+        )
+        return response
 
 
 class HostOriginMiddleware(BaseHTTPMiddleware):
@@ -178,8 +260,26 @@ class HostOriginMiddleware(BaseHTTPMiddleware):
         host = request.headers.get("host", "").split(":", 1)[0]
         origin = request.headers.get("origin")
         if host and host not in self.allowed_hosts:
-            return JSONResponse({"error": "host_not_allowed"}, status_code=403)
+            return JSONResponse(
+                {
+                    "error": {
+                        "code": "host_not_allowed",
+                        "message": "Host is not allowed.",
+                        "details": {},
+                    }
+                },
+                status_code=403,
+            )
         if origin and origin not in self.allowed_origins:
-            return JSONResponse({"error": "origin_not_allowed"}, status_code=403)
+            return JSONResponse(
+                {
+                    "error": {
+                        "code": "origin_not_allowed",
+                        "message": "Origin is not allowed.",
+                        "details": {},
+                    }
+                },
+                status_code=403,
+            )
         response = await call_next(request)
         return cast(Response, response)

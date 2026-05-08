@@ -13,7 +13,7 @@ from anthropic_news_mcp.models import (
     Source,
     SourceType,
 )
-from anthropic_news_mcp.research import compare_updates, evaluate_claims
+from anthropic_news_mcp.research import compare_updates, evaluate_claims, search_web_sources
 
 
 @pytest.fixture(autouse=True)
@@ -121,3 +121,104 @@ def test_compare_updates_detects_disappeared_items() -> None:
     cache_mod.save_snapshot("anthropic-newsroom", [second], ttl_seconds=3600)
     comparison = compare_updates(since=datetime(2026, 1, 1, tzinfo=UTC))
     assert [item["id"] for item in comparison["disappeared_items"]] == ["research-1"]
+
+
+@pytest.mark.asyncio
+async def test_search_web_sources_matches_cached_detail_text() -> None:
+    item = _item()
+    cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+    cache_mod.save_content_detail(
+        ContentDetail(
+            item_id=item.id,
+            url=item.url,
+            normalized_text="Hidden constitutional evaluation evidence.",
+            retrieved_at=datetime(2026, 5, 1, tzinfo=UTC),
+            content_hash="detail-search",
+            content_type="text/html",
+        )
+    )
+
+    result = await search_web_sources(
+        query="constitutional",
+        sources=["anthropic-newsroom"],
+        limit=5,
+    )
+
+    assert result["items"][0]["id"] == item.id
+    assert result["evidence"]
+
+
+@pytest.mark.asyncio
+async def test_search_web_sources_refresh_skips_cached_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    item = _item()
+    cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+    cache_mod.save_content_detail(
+        ContentDetail(
+            item_id=item.id,
+            url=item.url,
+            normalized_text="Cached evidence about agents.",
+            retrieved_at=datetime(2026, 5, 1, tzinfo=UTC),
+            content_hash="cached-detail",
+            content_type="text/html",
+        )
+    )
+
+    async def fail_fetch(news_item: NewsItem) -> ContentDetail:
+        raise AssertionError(f"unexpected refresh for {news_item.id}")
+
+    monkeypatch.setattr("anthropic_news_mcp.research.fetch_content_detail", fail_fetch)
+
+    result = await search_web_sources(
+        query="agents",
+        sources=["anthropic-newsroom"],
+        refresh=True,
+        limit=5,
+    )
+
+    assert result["items"][0]["id"] == item.id
+
+
+@pytest.mark.asyncio
+async def test_search_web_sources_refresh_caps_detail_fetches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    items = [
+        NewsItem(
+            id=f"refresh-{i}",
+            title=f"Refresh target {i}",
+            summary="agent detail",
+            url=f"https://anthropic.com/news/refresh-{i}",  # type: ignore[arg-type]
+            source=Source.ANTHROPIC,
+            source_key="anthropic-newsroom",
+            category=[Category.RESEARCH],
+            published_at=datetime(2026, 5, i + 1, tzinfo=UTC),
+            importance=2,
+        )
+        for i in range(25)
+    ]
+    cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=3600)
+    fetched: list[str] = []
+
+    async def fetch(news_item: NewsItem) -> ContentDetail:
+        fetched.append(news_item.id)
+        return ContentDetail(
+            item_id=news_item.id,
+            url=news_item.url,
+            normalized_text=f"Fetched detail for {news_item.id}",
+            retrieved_at=datetime(2026, 5, 1, tzinfo=UTC),
+            content_hash=f"hash-{news_item.id}",
+            content_type="text/html",
+        )
+
+    monkeypatch.setattr("anthropic_news_mcp.research.fetch_content_detail", fetch)
+
+    await search_web_sources(
+        query="Refresh",
+        sources=["anthropic-newsroom"],
+        refresh=True,
+        limit=25,
+    )
+
+    assert len(fetched) == 20

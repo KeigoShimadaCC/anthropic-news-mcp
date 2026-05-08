@@ -49,9 +49,11 @@ def test_all_items_have_urls(items):
 def test_all_items_have_dates(items):
 
     for item in items:
-        assert item.published_at.tzinfo is not None
-        # Dates should be within a reasonable range
-        assert item.published_at.year >= 2024
+        assert item.sort_at is not None
+        if item.published_at is not None:
+            assert item.published_at.tzinfo is not None
+            # Dates should be within a reasonable range
+            assert item.published_at.year >= 2024
 
 
 def test_importance_is_3(items):
@@ -66,7 +68,7 @@ def test_no_duplicate_ids(items):
 
 def test_sorted_newest_first(items):
     for a, b in zip(items, items[1:], strict=False):
-        assert a.published_at >= b.published_at
+        assert (a.sort_at or a.discovered_at) >= (b.sort_at or b.discovered_at)
 
 
 def test_category_assigned(items):

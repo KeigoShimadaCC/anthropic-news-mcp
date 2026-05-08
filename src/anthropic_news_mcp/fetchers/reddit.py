@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Literal, cast
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _SUBREDDITS = ["ClaudeAI", "anthropic"]
@@ -55,7 +55,7 @@ def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
         try:
             published_at = datetime.fromtimestamp(created_utc, tz=UTC)
         except (ValueError, OSError, OverflowError):
-            published_at = datetime.now(tz=UTC)
+            published_at = None
 
         permalink = str(post.get("permalink") or "")
         url = f"https://reddit.com{permalink}"
@@ -70,6 +70,7 @@ def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
                 source_key=RedditFetcher.source_key,
                 category=[Category.COMMUNITY],
                 published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=_importance(ups),
                 author=f"u/{post.get('author', 'unknown')}",
             )
@@ -93,5 +94,5 @@ class RedditFetcher(Fetcher):
                 resp.raise_for_status()
                 all_items.extend(_parse_subreddit(resp.json(), sub))
 
-        all_items.sort(key=lambda x: x.published_at, reverse=True)
+        all_items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
         return all_items

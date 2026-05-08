@@ -2,10 +2,10 @@
 
 import os
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _REPOS = [
@@ -46,7 +46,7 @@ def _parse_releases(data: list[dict[str, object]], repo: str) -> list[NewsItem]:
         try:
             published_at = datetime.fromisoformat(str(published_raw).replace("Z", "+00:00"))
         except ValueError:
-            published_at = datetime.now(tz=UTC)
+            published_at = None
 
         items.append(
             NewsItem(
@@ -58,6 +58,7 @@ def _parse_releases(data: list[dict[str, object]], repo: str) -> list[NewsItem]:
                 source_key=GitHubReleasesFetcher.source_key,
                 category=_classify_repo(repo),
                 published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=2,
             )
         )
@@ -90,5 +91,5 @@ class GitHubReleasesFetcher(Fetcher):
                 resp.raise_for_status()
                 all_items.extend(_parse_releases(resp.json(), repo))
 
-        all_items.sort(key=lambda x: x.published_at, reverse=True)
+        all_items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
         return all_items

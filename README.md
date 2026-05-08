@@ -189,12 +189,17 @@ export ANTHROPIC_NEWS_MCP_REQUIRED_SCOPES="anthropic-news:read"
 export ANTHROPIC_NEWS_MCP_ALLOWED_HOSTS="mcp.example.com"
 export ANTHROPIC_NEWS_MCP_ALLOWED_ORIGINS="https://client.example"
 export ANTHROPIC_NEWS_MCP_RESOURCE_SERVER_URL="https://mcp.example.com"
+export ANTHROPIC_NEWS_MCP_RATE_LIMIT_PER_MINUTE="120"
+export ANTHROPIC_NEWS_MCP_RATE_LIMIT_BURST="30"
 uvicorn anthropic_news_mcp.asgi:app --host 0.0.0.0 --port 8000
 ```
 
 The Streamable HTTP endpoint is `/mcp`. Remote mode is a resource server only: it validates
 bearer JWTs from the configured OIDC issuer and does not implement an OAuth authorization
 server. Startup fails unless issuer, audience, allowed hosts, and allowed origins are set.
+Remote responses include `x-request-id`, request logs include structured request fields, and
+the optional rate limit variables above control an in-memory token bucket. That limiter is
+single-process only; use an edge gateway or shared store for distributed deployments.
 
 ---
 
@@ -262,9 +267,9 @@ Claude Desktop / Cursor
   Caching is handled entirely by the retrieval layer.
 - **Per-source TTLs** — each source has its own TTL. A stale source returns cached data
   while a background refresh runs; one broken source never blocks the others.
-- **URL-based dedup** — items are deduplicated by canonical URL (fragments and `utm_*`
-  params stripped, remaining params sorted). An article posted to both the newsroom and
-  HN will appear once.
+- **Trust-ranked dedup** — items are deduplicated by canonical URL (fragments and `utm_*`
+  params stripped, remaining params sorted). When duplicates exist, official/docs/GitHub
+  sources outrank community discussion before recency and summary quality are considered.
 - **SQLite with WAL** — supports concurrent readers in a single server instance.
   The cache lives at `~/.cache/anthropic-news-mcp/cache.db` by default and can be changed
   with `ANTHROPIC_NEWS_MCP_CACHE_DB`. Multi-instance shared storage is future work.
@@ -279,7 +284,7 @@ Claude Desktop / Cursor
 
 ## Eval results
 
-This server ships with a golden-prompt eval suite using `claude-haiku-4-5` as judge.
+This server ships with deterministic offline evals and an optional golden-prompt eval suite using `claude-haiku-4-5` as judge.
 
 Each prompt is scored on three dimensions (0–2 each):
 
@@ -293,7 +298,14 @@ Each prompt is scored on three dimensions (0–2 each):
 
 See [`evals/`](./evals/) for the full methodology, golden Q&A pairs, and rubric.
 
-To run the eval yourself:
+To run the offline eval yourself:
+
+```bash
+pip install -e ".[dev]"
+python evals/run_offline_eval.py
+```
+
+To run the optional paid LLM eval:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -334,6 +346,9 @@ mypy --strict -p anthropic_news_mcp
 
 # Tests (offline — no live HTTP calls)
 pytest -q
+
+# Deterministic offline evals
+python evals/run_offline_eval.py
 
 # Live source-health audit (opt-in, not part of CI)
 anthropic-news-audit

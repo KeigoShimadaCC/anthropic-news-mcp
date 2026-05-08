@@ -1,6 +1,6 @@
 # Eval Rubric
 
-Each of the 20 golden prompts is scored on three dimensions, each 0–2:
+Each of the 27 golden prompts is scored on three dimensions, each 0–2:
 
 ## Dimensions
 
@@ -34,7 +34,7 @@ Each of the 20 golden prompts is scored on three dimensions, each 0–2:
 
 ## Suite pass threshold
 
-**Mean score across 20 prompts ≥ 5.0 / 6.0**
+**Mean score across 27 golden prompts ≥ 5.0 / 6.0**
 
 This equates to roughly "right tool + grounded + helpful" on nearly every prompt.
 

@@ -31,7 +31,10 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # or
 .venv/bin/python -m anthropic_news_mcp
 
-# Run eval suite (requires ANTHROPIC_API_KEY; costs ~$0.15)
+# Run deterministic offline eval suite
+.venv/bin/python evals/run_offline_eval.py
+
+# Run optional LLM eval suite (requires ANTHROPIC_API_KEY; costs ~$0.15)
 .venv/bin/python evals/run_eval.py
 # Run specific prompts only
 .venv/bin/python evals/run_eval.py --ids q01,q08,q18
@@ -74,4 +77,4 @@ All 146+ tests are **offline** — no live HTTP. Fetcher tests parse frozen fixt
 
 ### Eval harness
 
-`evals/run_eval.py` calls tools in-process (same `mcp.call_tool` pattern), sends results to `claude-haiku-4-5` as judge, scores 0–2 per dimension (tool selection / faithfulness / helpfulness). Pass threshold: mean ≥ 5.0/6.0. Results go to `evals/results/` (gitignored). The eval workflow in `.github/workflows/eval.yml` is manual-trigger only.
+`evals/run_offline_eval.py` seeds a temp SQLite cache and validates deterministic MCP tool behavior without API keys or live HTTP. `evals/run_eval.py` remains the optional paid LLM judge harness: it calls tools in-process, sends results to `claude-haiku-4-5` as judge, and scores 0–2 per dimension. Results go to `evals/results/` (gitignored). The LLM eval workflow in `.github/workflows/eval.yml` is manual-trigger only.

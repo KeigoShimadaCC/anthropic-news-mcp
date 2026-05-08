@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 from . import cache
 from .config import SOURCE_REGISTRY, SourceConfig
-from .models import Category, NewsItem, SourceHealth, SourceStatus
+from .models import Category, EvidenceTier, NewsItem, SourceHealth, SourceStatus, SourceType
 
 _log = logging.getLogger(__name__)
 _UTM_RE = re.compile(r"utm_[a-z_]+", re.IGNORECASE)
@@ -36,6 +36,42 @@ def _sanitize_error(exc: Exception) -> str:
         msg,
     )
     return msg[:200]
+
+
+def _source_rank(item: NewsItem) -> int:
+    ranks = {
+        SourceType.OFFICIAL: 4,
+        SourceType.DOCS: 3,
+        SourceType.GITHUB: 2,
+        SourceType.COMMUNITY: 1,
+    }
+    return ranks.get(item.source_type, 0)
+
+
+def _tier_rank(item: NewsItem) -> int:
+    return {EvidenceTier.HIGH: 3, EvidenceTier.MEDIUM: 2, EvidenceTier.LOW: 1}.get(
+        item.evidence_tier, 0
+    )
+
+
+def _representative_key(item: NewsItem) -> tuple[int, int, int, int, int, int]:
+    summary_quality = min(len(item.summary.strip()), 400)
+    registry_order = next(
+        (idx for idx, source in enumerate(SOURCE_REGISTRY) if source.key == item.source_key),
+        len(SOURCE_REGISTRY),
+    )
+    return (
+        _source_rank(item),
+        _tier_rank(item),
+        1 if item.published_at is not None else 0,
+        item.importance,
+        summary_quality,
+        -registry_order,
+    )
+
+
+def _sort_dt(item: NewsItem) -> datetime:
+    return item.sort_at or item.published_at or item.discovered_at
 
 
 async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHealth]:
@@ -121,27 +157,27 @@ async def get_recent_updates(
             )
         fresh_results.append((items, health))
 
-    all_items: list[NewsItem] = []
+    grouped: dict[str, NewsItem] = {}
     all_healths: list[SourceHealth] = []
-    seen_urls: set[str] = set()
 
     for items, health in [*fresh_results, *stale_results]:
         all_healths.append(health)
         for item in items:
             canonical = _canonicalize_url(str(item.url))
-            if canonical in seen_urls:
-                continue
-            seen_urls.add(canonical)
-            all_items.append(item)
+            existing = grouped.get(canonical)
+            if existing is None or _representative_key(item) > _representative_key(existing):
+                grouped[canonical] = item
+
+    all_items = list(grouped.values())
 
     # Apply filters
     if categories:
         cat_set = set(categories)
         all_items = [i for i in all_items if cat_set.intersection(i.category)]
     if since:
-        all_items = [i for i in all_items if i.published_at >= since]
+        all_items = [i for i in all_items if _sort_dt(i) >= since]
 
-    all_items.sort(key=lambda x: x.published_at, reverse=True)
+    all_items.sort(key=_sort_dt, reverse=True)
     return all_items[:limit], all_healths
 
 
@@ -164,7 +200,7 @@ async def get_health() -> list[SourceHealth]:
             healths.append(
                 SourceHealth(
                     key=config.key,
-                    status=SourceStatus.DOWN,
+                    status=SourceStatus.NOT_FETCHED,
                     fetched_at=now,
                     expires_at=now,
                     item_count=0,

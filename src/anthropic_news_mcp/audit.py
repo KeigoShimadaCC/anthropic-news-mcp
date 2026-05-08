@@ -102,9 +102,10 @@ async def _audit_one(config: SourceConfig) -> AuditSourceResult:
 
 
 def _newest(items: list[NewsItem]) -> datetime | None:
-    if not items:
+    dated = [item.published_at for item in items if item.published_at is not None]
+    if not dated:
         return None
-    return max(item.published_at for item in items)
+    return max(dated)
 
 
 async def run_audit(source_keys: list[str] | None = None) -> dict[str, object]:
@@ -176,7 +177,7 @@ def main() -> None:
         bad = [
             source
             for source in sources
-            if source["key"] in _CANONICAL_REQUIRED and source["status"] == "failed"
+            if source["key"] in _CANONICAL_REQUIRED and source["status"] in {"failed", "warning"}
         ]
         if bad:
             raise SystemExit(1)

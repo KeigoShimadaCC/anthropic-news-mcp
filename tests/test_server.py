@@ -186,12 +186,13 @@ async def test_get_recent_updates_invalid_category_graceful() -> None:
         {"sources": ["anthropic-newsroom"], "categories": ["not-a-real-category"]},
     )
     assert "error" in data
-    assert "not-a-real-category" in data["error"]
+    assert data["error"]["code"] == "invalid_request"
+    assert "not-a-real-category" in data["error"]["message"]
     # Valid keys should be listed in the error
-    assert "models" in data["error"]
-    assert "ops" in data["error"]
-    assert "engineering" in data["error"]
-    assert "economics" in data["error"]
+    assert "models" in data["error"]["message"]
+    assert "ops" in data["error"]["message"]
+    assert "engineering" in data["error"]["message"]
+    assert "economics" in data["error"]["message"]
 
 
 @pytest.mark.asyncio
@@ -223,7 +224,8 @@ async def test_get_recent_updates_unknown_source_key_returns_error() -> None:
         {"sources": ["anthropic-newsroom-typo"]},
     )
     assert "error" in data
-    assert "anthropic-newsroom-typo" in data["error"]
+    assert data["error"]["code"] == "invalid_request"
+    assert "anthropic-newsroom-typo" in data["error"]["message"]
 
 
 @pytest.mark.asyncio
@@ -234,22 +236,35 @@ async def test_get_recent_updates_rejects_date_only_since() -> None:
         {"sources": ["anthropic-newsroom"], "since": "2026-05-01"},
     )
     assert "error" in data
-    assert "timezone-aware" in data["error"]
+    assert data["error"]["code"] == "invalid_request"
+    assert "timezone-aware" in data["error"]["message"]
 
 
 @pytest.mark.asyncio
 async def test_get_recent_updates_rejects_bad_limit() -> None:
     data = await _call("get_recent_updates", {"limit": 0})
-    assert data["error"] == "limit must be greater than zero."
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "limit must be greater than zero.",
+        "details": {},
+    }
 
 
 @pytest.mark.asyncio
 async def test_search_updates_rejects_blank_query_and_bad_limit() -> None:
     data = await _call("search_updates", {"query": "   "})
-    assert data["error"] == "query must not be blank."
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "query must not be blank.",
+        "details": {},
+    }
 
     data = await _call("search_updates", {"query": "claude", "limit": -1})
-    assert data["error"] == "limit must be greater than zero."
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "limit must be greater than zero.",
+        "details": {},
+    }
 
 
 @pytest.mark.asyncio
@@ -457,7 +472,88 @@ async def test_search_web_sources_rejects_inverted_time_range() -> None:
         },
     )
     assert "error" in data
-    assert "since" in data["error"]
+    assert data["error"]["code"] == "invalid_request"
+    assert "since" in data["error"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_search_web_sources_rejects_invalid_source_type_and_importance() -> None:
+    data = await _call(
+        "search_web_sources",
+        {"query": "claude", "source_types": ["not-real"]},
+    )
+    assert "error" in data
+    assert data["error"]["code"] == "invalid_request"
+    assert "Unknown source types" in data["error"]["message"]
+
+    data = await _call(
+        "search_web_sources",
+        {"query": "claude", "importance": [4]},
+    )
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "importance values must be 1, 2, or 3.",
+        "details": {"invalid": [4]},
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_update_detail_rejects_blank_id_and_bad_limit() -> None:
+    data = await _call("get_update_detail", {"id": "   "})
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "id must not be blank.",
+        "details": {},
+    }
+
+    data = await _call("get_update_detail", {"id": "x", "max_chars": 0})
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "limit must be greater than zero.",
+        "details": {},
+    }
+
+
+@pytest.mark.asyncio
+async def test_research_session_tools_validate_blank_and_unknown_inputs() -> None:
+    data = await _call("create_research_session", {"title": "   "})
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "title must not be blank.",
+        "details": {},
+    }
+
+    data = await _call("save_research_note", {"session_id": "missing", "text": "note"})
+    assert data["error"]["message"] == "Unknown research session: missing"
+
+    data = await _call(
+        "save_research_report",
+        {"session_id": "missing", "title": "Report", "markdown": "body"},
+    )
+    assert data["error"]["message"] == "Unknown research session: missing"
+
+    data = await _call("get_research_session", {"session_id": "   "})
+    assert data["error"]["message"] == "session_id must not be blank."
+
+    data = await _call("evaluate_claims", {"claims": ["   "]})
+    assert data["error"]["message"] == "claims must include at least one non-blank claim."
+
+
+@pytest.mark.asyncio
+async def test_build_digest_context_rejects_inverted_time_range() -> None:
+    data = await _call(
+        "build_digest_context",
+        {
+            "topic": "claude",
+            "since": "2026-05-03T00:00:00Z",
+            "until": "2026-05-01T00:00:00Z",
+        },
+    )
+    assert data["error"] == {
+        "code": "invalid_request",
+        "message": "since must be earlier than until.",
+        "details": {},
+    }
 
 
 @pytest.mark.asyncio
@@ -471,4 +567,5 @@ async def test_get_timeline_rejects_inverted_time_range() -> None:
         },
     )
     assert "error" in data
-    assert "since" in data["error"]
+    assert data["error"]["code"] == "invalid_request"
+    assert "since" in data["error"]["message"]

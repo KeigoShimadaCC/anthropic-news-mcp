@@ -9,7 +9,7 @@ from typing import Any, Literal, cast
 from selectolax.parser import HTMLParser
 
 from ..http import get_client
-from ..models import Category, NewsItem, Source
+from ..models import Category, DateConfidence, NewsItem, Source
 from .base import Fetcher
 
 _BASE = "https://www.anthropic.com"
@@ -81,7 +81,7 @@ def _stable_id(prefix: str, value: str) -> str:
     return f"{prefix}-{digest}"
 
 
-def _parse_date(text: str, default_day: int = 1) -> datetime:
+def _parse_date(text: str, default_day: int = 1) -> datetime | None:
     m = _DATE_RE.search(text)
     if m:
         month = (m.group(1) or m.group(2)).strip()[:3]
@@ -103,7 +103,7 @@ def _parse_date(text: str, default_day: int = 1) -> datetime:
         except ValueError:
             pass
 
-    return datetime.now(tz=UTC)
+    return None
 
 
 def _categories_from_text(text: str, default: list[Category]) -> list[Category]:
@@ -172,6 +172,7 @@ def parse_anthropic_listing_html(
         summary_node = next((c for c in a.iter() if c.tag == "p" and c.text(strip=True)), None)
         summary = summary_node.text(strip=True)[:400] if summary_node else ""
         categories = _categories_from_text(text, default_categories)
+        published_at = _parse_date(text)
 
         items.append(
             NewsItem(
@@ -182,14 +183,15 @@ def parse_anthropic_listing_html(
                 source=Source.ANTHROPIC,
                 source_key=source_key,
                 category=categories,
-                published_at=_parse_date(text),
+                published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=importance
                 if importance is not None
                 else (3 if Category.POLICY in categories else 2),
             )
         )
 
-    items.sort(key=lambda x: x.published_at, reverse=True)
+    items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
     return items[:limit]
 
 
@@ -254,6 +256,7 @@ def parse_release_notes_html(
         seen.add(item_id)
 
         summary = " · ".join(bullets[:3])[:400]
+        published_at = _parse_date(date_text)
         items.append(
             NewsItem(
                 id=item_id,
@@ -263,14 +266,15 @@ def parse_release_notes_html(
                 source=Source.ANTHROPIC,
                 source_key=source_key,
                 category=categories,
-                published_at=_parse_date(date_text),
+                published_at=published_at,
+                date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
                 importance=2,
             )
         )
         if len(items) >= limit:
             break
 
-    items.sort(key=lambda x: x.published_at, reverse=True)
+    items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
     return items[:limit]
 
 
@@ -435,7 +439,7 @@ class EconomicIndexFetcher(Fetcher):
                 or "economic" in f"{item.title} {item.summary}".lower()
             ],
         ]
-        items.sort(key=lambda x: x.published_at, reverse=True)
+        items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
         return items[:20]
 
 
@@ -501,7 +505,7 @@ class TrustPolicyFetcher(Fetcher):
             terms=_TRUST_TERMS,
             categories=[Category.POLICY],
         )
-        items.sort(key=lambda x: x.published_at, reverse=True)
+        items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
         return items[:25]
 
 
@@ -527,7 +531,8 @@ def parse_status_payloads(
                 source=Source.ANTHROPIC,
                 source_key=source_key,
                 category=[Category.OPS],
-                published_at=datetime.now(tz=UTC),
+                published_at=None,
+                date_confidence=DateConfidence.UNKNOWN,
                 importance=_impact_to_importance(indicator),
                 tags=["status", indicator],
             )
@@ -539,7 +544,7 @@ def parse_status_payloads(
     for maintenance in (scheduled or {}).get("scheduled_maintenances", []):
         items.append(_status_item(maintenance, source_key=source_key, kind="maintenance"))
 
-    items.sort(key=lambda x: x.published_at, reverse=True)
+    items.sort(key=lambda x: x.sort_at or x.discovered_at, reverse=True)
     return items
 
 
@@ -580,7 +585,7 @@ def _status_item(payload: dict[str, Any], *, source_key: str, kind: str) -> News
         or payload.get("created_at")
         or payload.get("updated_at")
     )
-    published_at = _parse_iso_datetime(str(timestamp)) if timestamp else datetime.now(tz=UTC)
+    published_at = _parse_iso_datetime(str(timestamp)) if timestamp else None
     status = payload.get("status", "")
     summary = payload.get("impact_override") or payload.get("body") or status or ""
     url = payload.get("shortlink") or payload.get("url") or "https://status.claude.com/"
@@ -593,6 +598,7 @@ def _status_item(payload: dict[str, Any], *, source_key: str, kind: str) -> News
         source_key=source_key,
         category=[Category.OPS],
         published_at=published_at,
+        date_confidence=DateConfidence.EXACT if published_at else DateConfidence.UNKNOWN,
         importance=_impact_to_importance(impact),
         tags=[
             "status",
@@ -603,11 +609,11 @@ def _status_item(payload: dict[str, Any], *, source_key: str, kind: str) -> News
     )
 
 
-def _parse_iso_datetime(value: str) -> datetime:
+def _parse_iso_datetime(value: str) -> datetime | None:
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return datetime.now(tz=UTC)
+        return None
 
 
 class StatusFetcher(Fetcher):

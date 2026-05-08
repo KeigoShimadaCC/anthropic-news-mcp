@@ -1,7 +1,8 @@
 # Eval Suite
 
-This directory contains a golden-prompt evaluation harness that scores the
-`anthropic-news-mcp` server using `claude-haiku-4-5` as judge.
+This directory contains deterministic offline evals plus an optional golden-prompt
+evaluation harness that scores the `anthropic-news-mcp` server using
+`claude-haiku-4-5` as judge.
 
 ## What it measures
 
@@ -17,7 +18,19 @@ Each prompt is scored on three dimensions (0–2 each), for a maximum of 6 per p
 
 See [rubric.md](./rubric.md) for the full scoring guide.
 
-## Running the eval
+## Running the offline eval
+
+The offline eval is deterministic, does not call external APIs, and is suitable for CI:
+
+```bash
+pip install -e ".[dev]"
+python evals/run_offline_eval.py
+python evals/run_offline_eval.py --ids offline-01,offline-05
+```
+
+Results are written to `evals/results/offline_eval_<timestamp>.json`.
+
+## Running the optional LLM eval
 
 ```bash
 # Install eval dependencies
@@ -58,8 +71,11 @@ sample titles, sanitized errors, and warnings for empty or stale canonical sourc
 | File | Purpose |
 |------|---------|
 | `golden.yaml` | Golden prompts with expected tools, parameters, and response criteria |
+| `offline_cases.yaml` | Deterministic tool-level eval cases |
 | `rubric.md` | Scoring rubric for the LLM judge |
 | `run_eval.py` | Harness: drives the MCP server, calls Haiku as judge |
+| `run_offline_eval.py` | Offline harness for deterministic MCP tool checks |
+| `seed.py` | Shared deterministic cache seeding for evals |
 | `results/` | Output JSON files (gitignored except `.gitkeep`) |
 
 ## How the harness works

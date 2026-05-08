@@ -1,0 +1,78 @@
+[
+  {
+    "id": "offline-01",
+    "tool": "get_recent_updates",
+    "args": {
+      "sources": ["anthropic-docs-claude-code"],
+      "categories": ["claude-code"],
+      "limit": 5
+    },
+    "min_items": 1,
+    "item_source_keys": ["anthropic-docs-claude-code"],
+    "response_contains": ["Claude Code"]
+  },
+  {
+    "id": "offline-02",
+    "tool": "get_recent_updates",
+    "args": {
+      "sources": ["anthropic-status"],
+      "categories": ["ops"],
+      "limit": 5
+    },
+    "min_items": 1,
+    "item_source_keys": ["anthropic-status"],
+    "response_contains": ["Operational"]
+  },
+  {
+    "id": "offline-03",
+    "tool": "search_updates",
+    "args": {"query": "agents", "limit": 5},
+    "min_items": 1,
+    "response_contains": ["agents"]
+  },
+  {
+    "id": "offline-04",
+    "tool": "search_web_sources",
+    "args": {
+      "query": "enterprise",
+      "sources": ["anthropic-business-infrastructure"],
+      "categories": ["business"],
+      "limit": 5
+    },
+    "min_items": 1,
+    "item_source_keys": ["anthropic-business-infrastructure"],
+    "response_contains": ["enterprise"]
+  },
+  {
+    "id": "offline-05",
+    "tool": "get_recent_updates",
+    "args": {"sources": ["anthropic-newsroom-typo"]},
+    "error_contains": ["Unknown source keys", "anthropic-newsroom-typo"]
+  },
+  {
+    "id": "offline-06",
+    "tool": "search_web_sources",
+    "args": {"query": "claude", "source_types": ["not-real"]},
+    "error_contains": ["Unknown source types"]
+  },
+  {
+    "id": "offline-07",
+    "tool": "build_digest_context",
+    "args": {
+      "topic": "claude",
+      "since": "2026-05-03T00:00:00Z",
+      "until": "2026-05-01T00:00:00Z"
+    },
+    "error_contains": ["since must be earlier than until"]
+  },
+  {
+    "id": "offline-08",
+    "tool": "list_sources",
+    "args": {},
+    "response_contains": [
+      "anthropic-newsroom",
+      "anthropic-docs-claude-code",
+      "reddit-claude"
+    ]
+  }
+]

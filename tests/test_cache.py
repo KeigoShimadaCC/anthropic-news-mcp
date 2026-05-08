@@ -509,3 +509,58 @@ class TestGetItemHistorySince:
         cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=3600)
         rows = cache_mod.get_item_history_since(None, limit=2)
         assert len(rows) == 2
+
+    def test_preserves_last_changed_until_content_hash_changes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        current_ms = 1_000
+        monkeypatch.setattr(cache_mod, "_now_ms", lambda: current_ms)
+        item = _item("hist-change")
+
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        first = cache_mod.get_item_history_since(None)[0]
+
+        current_ms = 2_000
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        unchanged = cache_mod.get_item_history_since(None)[0]
+        assert unchanged["first_seen_at"] == first["first_seen_at"]
+        assert unchanged["last_changed_at"] == first["last_changed_at"]
+
+        cache_mod.save_content_detail(
+            ContentDetail(
+                item_id=item.id,
+                url=item.url,
+                normalized_text="Changed content",
+                retrieved_at=datetime(2026, 1, 2, tzinfo=UTC),
+                content_hash="hash-changed",
+                content_type="text/html",
+            )
+        )
+
+        current_ms = 3_000
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        changed = cache_mod.get_item_history_since(None)[0]
+        assert changed["content_hash"] == "hash-changed"
+        assert changed["last_changed_at"] > unchanged["last_changed_at"]
+
+        current_ms = 4_000
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        unchanged_again = cache_mod.get_item_history_since(None)[0]
+        assert unchanged_again["last_changed_at"] == changed["last_changed_at"]
+
+    def test_empty_snapshot_records_disappeared_history(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        current_ms = 1_000
+        monkeypatch.setattr(cache_mod, "_now_ms", lambda: current_ms)
+        item = _item("hist-disappeared")
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+
+        current_ms = 2_000
+        cache_mod.save_snapshot("anthropic-newsroom", [], ttl_seconds=3600)
+
+        assert cache_mod.get_item(item.id) is None
+        rows = cache_mod.get_item_history_since(None)
+        assert len(rows) == 1
+        assert rows[0]["item"].id == item.id
+        assert rows[0]["last_changed_at"] == datetime.fromtimestamp(2, tz=UTC)

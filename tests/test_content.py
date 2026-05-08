@@ -130,8 +130,12 @@ class TestBuildExcerpts:
 
     def test_excerpt_ids_are_stable(self) -> None:
         detail = self._detail("stable content")
-        e1 = build_excerpts(_item(), detail, source_type=SourceType.OFFICIAL, evidence_tier=EvidenceTier.HIGH)
-        e2 = build_excerpts(_item(), detail, source_type=SourceType.OFFICIAL, evidence_tier=EvidenceTier.HIGH)
+        e1 = build_excerpts(
+            _item(), detail, source_type=SourceType.OFFICIAL, evidence_tier=EvidenceTier.HIGH
+        )
+        e2 = build_excerpts(
+            _item(), detail, source_type=SourceType.OFFICIAL, evidence_tier=EvidenceTier.HIGH
+        )
         assert e1[0].evidence_id == e2[0].evidence_id
 
     def test_empty_text_returns_empty(self) -> None:
