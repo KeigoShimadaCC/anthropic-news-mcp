@@ -68,13 +68,15 @@ class TestDbPath:
         """If stat() raises, get_db_path() should still return a path (non-fatal)."""
         cache_home = tmp_path / "stat_fail"
         expected_cache_dir = cache_home / "anthropic-news-mcp"
+        expected_cache_dir.mkdir(parents=True, exist_ok=True)
+        resolved_target = expected_cache_dir.resolve()
         monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
         cache_mod._DB_PATH = None  # type: ignore[attr-defined]
 
         original_stat = Path.stat
 
         def bad_stat(self: Path, **kwargs: object) -> object:
-            if self == expected_cache_dir.resolve():
+            if str(self) == str(resolved_target):
                 raise OSError("simulated stat failure")
             return original_stat(self, **kwargs)
 
