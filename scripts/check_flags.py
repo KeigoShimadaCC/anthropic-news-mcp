@@ -44,7 +44,9 @@ def main() -> int:
     if stale:
         errors.append(f"Stale flags (defined but never used in source): {stale}")
     if undefined_refs:
-        errors.append(f"Undefined flag references (FLAGS.X where X not in FeatureFlags): {undefined_refs}")
+        errors.append(
+            f"Undefined flag references (FLAGS.X where X not in FeatureFlags): {undefined_refs}"
+        )
 
     if errors:
         print("Feature flag check FAILED:", file=sys.stderr)

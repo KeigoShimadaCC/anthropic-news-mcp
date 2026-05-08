@@ -54,9 +54,7 @@ def check_ci_gate_coverage(content: str) -> list[str]:
     errors: list[str] = []
 
     # Extract commands from the CI Quality Gates section of AGENTS.md
-    gate_section = re.search(
-        r"## CI Quality Gates\n(.*?)(?=\n##|\Z)", content, re.DOTALL
-    )
+    gate_section = re.search(r"## CI Quality Gates\n(.*?)(?=\n##|\Z)", content, re.DOTALL)
     if not gate_section:
         return ["CI Quality Gates section not found in AGENTS.md"]
 
@@ -98,7 +96,9 @@ def main() -> int:
             print(f"  - {err}", file=sys.stderr)
         return 1
 
-    print(f"AGENTS.md validation passed ({len(content)} bytes, no broken links or missing sections)")
+    print(
+        f"AGENTS.md validation passed ({len(content)} bytes, no broken links or missing sections)"
+    )
     return 0
 
 

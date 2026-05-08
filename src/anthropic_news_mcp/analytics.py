@@ -14,6 +14,7 @@ def init_analytics() -> None:
         return
     try:
         import posthog
+
         posthog.api_key = api_key
         posthog.host = os.getenv("POSTHOG_HOST", "https://app.posthog.com")
         posthog.debug = False
@@ -28,6 +29,7 @@ def capture(event: str, properties: dict[str, object] | None = None) -> None:
         return
     try:
         import posthog
+
         posthog.capture("anonymous", event, properties or {})
     except Exception:
         pass
