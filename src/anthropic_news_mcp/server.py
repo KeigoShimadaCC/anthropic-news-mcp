@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -58,6 +59,7 @@ OPEN_WORLD_READ = ToolAnnotations(
 LOCAL_WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 
 mcp = FastMCP("anthropic-news", instructions=SERVER_INSTRUCTIONS)
+_log = logging.getLogger(__name__)
 
 
 def _valid_source_keys() -> set[str]:
@@ -65,6 +67,14 @@ def _valid_source_keys() -> set[str]:
 
 
 def _error(message: str, **details: object) -> dict[str, object]:
+    _log.info(
+        "invalid_request",
+        extra={
+            "error_code": "invalid_request",
+            "error_message": message,
+            "error_details": details,
+        },
+    )
     return {"error": {"code": "invalid_request", "message": message, "details": details}}
 
 

@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy-strict
+        name: mypy (strict)
+        entry: mypy --strict src/anthropic_news_mcp/*.py src/anthropic_news_mcp/fetchers/*.py
+        language: python
+        additional_dependencies: [mypy]
+        pass_filenames: false
+
+      - id: pytest-offline
+        name: pytest (offline suite)
+        entry: pytest -q
+        language: python
+        additional_dependencies: [pytest]
+        pass_filenames: false
+        stages: [pre-push]

@@ -1,0 +1,39 @@
+name: Bug report
+description: Report a reproducible bug or regression.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Share exact commands, tool calls, or request payloads.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Paste key stack traces, CI links, or MCP responses.
+    validations:
+      required: false
+
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, and execution context (local/CI/remote).
+    validations:
+      required: true

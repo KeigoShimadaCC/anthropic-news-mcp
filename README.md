@@ -337,12 +337,16 @@ git clone https://github.com/KeigoShimadaCC/anthropic-news-mcp
 cd anthropic-news-mcp
 uv pip install -e ".[dev]"
 
+# Optional: install local git hooks
+pre-commit install
+pre-commit install --hook-type pre-push
+
 # Lint + format
 ruff check .
 ruff format .
 
 # Type check
-mypy --strict -p anthropic_news_mcp
+mypy --strict src/anthropic_news_mcp/*.py src/anthropic_news_mcp/fetchers/*.py
 
 # Tests (offline — no live HTTP calls)
 pytest -q
@@ -359,6 +363,25 @@ anthropic-news-audit --strict
 # Run the server locally
 python -m anthropic_news_mcp
 ```
+
+### Dev container
+
+This repo includes `.devcontainer/devcontainer.json` for a reproducible VS Code dev environment.
+Opening the repo in a dev container installs `.[dev]` automatically.
+
+### Repository safeguards
+
+- **Dependency automation:** `.github/dependabot.yml` checks Python and GitHub Actions dependencies weekly.
+- **Security scanning:** `.github/workflows/security.yml` runs CodeQL on push/PR and runs `pip-audit` on schedule/manual trigger.
+- **Eval workflow trigger:** `.github/workflows/eval.yml` is manual (`workflow_dispatch`) to avoid failing normal pushes when `ANTHROPIC_API_KEY` is not configured.
+- **Branch protection target state (default branch):**
+  - Require pull requests before merge
+  - Require at least 1 approval
+  - Require status checks `lint-and-test` and `CodeQL`
+  - Restrict direct pushes by non-admin contributors
+  - Enforce admins
+
+If you are a repo admin, apply branch protection in GitHub settings for the default branch after these workflows are active.
 
 ---
 

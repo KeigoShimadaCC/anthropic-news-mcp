@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install (use the project venv)
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
+# Optional: install local git hooks
+.venv/bin/pre-commit install
+.venv/bin/pre-commit install --hook-type pre-push
+
 # Run all tests
 .venv/bin/pytest tests/ -v
 
@@ -24,7 +28,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/ruff format .
 
 # Type check (excludes evals/)
-.venv/bin/mypy --strict src/
+.venv/bin/mypy --strict src/anthropic_news_mcp/*.py src/anthropic_news_mcp/fetchers/*.py
 
 # Run the server locally (stdio mode)
 .venv/bin/anthropic-news-mcp

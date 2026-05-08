@@ -259,7 +259,18 @@ class HostOriginMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         host = request.headers.get("host", "").split(":", 1)[0]
         origin = request.headers.get("origin")
+        request_id = request.headers.get("x-request-id") or uuid4().hex
         if host and host not in self.allowed_hosts:
+            _log.warning(
+                "remote_request_denied",
+                extra={
+                    "request_id": request_id,
+                    "reason": "host_not_allowed",
+                    "host": host,
+                    "origin": origin,
+                    "path": request.url.path,
+                },
+            )
             return JSONResponse(
                 {
                     "error": {
@@ -269,8 +280,19 @@ class HostOriginMiddleware(BaseHTTPMiddleware):
                     }
                 },
                 status_code=403,
+                headers={"x-request-id": request_id},
             )
         if origin and origin not in self.allowed_origins:
+            _log.warning(
+                "remote_request_denied",
+                extra={
+                    "request_id": request_id,
+                    "reason": "origin_not_allowed",
+                    "host": host,
+                    "origin": origin,
+                    "path": request.url.path,
+                },
+            )
             return JSONResponse(
                 {
                     "error": {
@@ -280,6 +302,7 @@ class HostOriginMiddleware(BaseHTTPMiddleware):
                     }
                 },
                 status_code=403,
+                headers={"x-request-id": request_id},
             )
         response = await call_next(request)
         return cast(Response, response)
