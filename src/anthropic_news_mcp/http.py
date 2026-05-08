@@ -12,5 +12,6 @@ def get_client(**kwargs: object) -> httpx.AsyncClient:
         timeout=_TIMEOUT,
         headers=_HEADERS,
         follow_redirects=True,
+        max_redirects=5,
         **kwargs,  # type: ignore[arg-type]
     )

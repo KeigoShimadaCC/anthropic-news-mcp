@@ -147,6 +147,63 @@ class TestReddit:
             if item.author:
                 assert item.author.startswith("u/")
 
+    def test_invalid_timestamp_falls_back_to_now(self):
+        """Malformed created_utc must not crash the parser."""
+        import math
+        from datetime import datetime, timezone
+
+        data = {
+            "data": {
+                "children": [
+                    {
+                        "data": {
+                            "id": "ts1",
+                            "title": "Overflow timestamp",
+                            "stickied": False,
+                            "pinned": False,
+                            "ups": 50,
+                            "num_comments": 1,
+                            "selftext": "",
+                            "created_utc": float("inf"),
+                            "permalink": "/r/ClaudeAI/comments/ts1/test/",
+                            "author": "user",
+                        }
+                    }
+                ]
+            }
+        }
+        before = datetime.now(tz=timezone.utc)
+        items = _parse_subreddit(data, "ClaudeAI")
+        after = datetime.now(tz=timezone.utc)
+        assert len(items) == 1
+        assert before <= items[0].published_at <= after
+
+    def test_non_numeric_ups_falls_back_to_zero(self):
+        """Non-numeric ups/num_comments must not crash the parser."""
+        data = {
+            "data": {
+                "children": [
+                    {
+                        "data": {
+                            "id": "num1",
+                            "title": "Post with bad numeric fields",
+                            "stickied": False,
+                            "pinned": False,
+                            "ups": "many",
+                            "num_comments": "lots",
+                            "selftext": "",
+                            "created_utc": 1735689600.0,
+                            "permalink": "/r/ClaudeAI/comments/num1/test/",
+                            "author": "user",
+                        }
+                    }
+                ]
+            }
+        }
+        items = _parse_subreddit(data, "ClaudeAI")
+        assert len(items) == 1
+        assert items[0].importance == 1  # ups fell back to 0
+
     def test_html_entities_decoded(self):
         data = {
             "data": {

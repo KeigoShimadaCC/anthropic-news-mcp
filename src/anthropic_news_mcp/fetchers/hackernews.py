@@ -25,7 +25,10 @@ def _importance(points: int) -> int:
 def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
     items: list[NewsItem] = []
     for hit in data.get("hits", []):  # type: ignore[union-attr]
-        points = int(hit.get("points") or 0)  # type: ignore[arg-type]
+        try:
+            points = int(float(hit.get("points") or 0))  # type: ignore[arg-type]
+        except (ValueError, TypeError):
+            points = 0
         if points < _MIN_POINTS:
             continue
 
@@ -35,7 +38,10 @@ def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
             continue
 
         url = str(hit.get("url") or f"https://news.ycombinator.com/item?id={obj_id}")
-        num_comments = int(hit.get("num_comments") or 0)  # type: ignore[arg-type]
+        try:
+            num_comments = int(float(hit.get("num_comments") or 0))  # type: ignore[arg-type]
+        except (ValueError, TypeError):
+            num_comments = 0
         story_text = str(hit.get("story_text") or "")
 
         if story_text:

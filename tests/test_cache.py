@@ -30,6 +30,60 @@ def _item(id: str, url: str = "https://anthropic.com/news/test") -> NewsItem:
     )
 
 
+class TestDbPath:
+    def test_world_readable_dir_warns(self, tmp_path: Path) -> None:
+        """get_db_path() should warn when the cache directory is world-readable."""
+        import os
+        import pytest
+
+        pub = tmp_path / "pub_cache"
+        pub.mkdir(mode=0o777)
+        cache_mod.set_db_path(pub / "cache.db")
+        # Clear override so get_db_path() re-runs the stat() check
+        cache_mod._DB_PATH = None  # type: ignore[attr-defined]
+        try:
+            import monkeypatch  # noqa: F401 — not available here; use env var approach
+        except ImportError:
+            pass
+
+        import os as _os
+        orig = _os.environ.get("XDG_CACHE_HOME")
+        _os.environ["XDG_CACHE_HOME"] = str(tmp_path / "pub_cache")
+        try:
+            with pytest.warns(UserWarning, match="world-readable"):
+                cache_mod.get_db_path()
+        finally:
+            if orig is None:
+                _os.environ.pop("XDG_CACHE_HOME", None)
+            else:
+                _os.environ["XDG_CACHE_HOME"] = orig
+            cache_mod.set_db_path(tmp_path / "test_cache.db")
+
+    def test_stat_failure_does_not_crash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """If stat() raises, get_db_path() should still return a path (non-fatal)."""
+        import os as _os
+
+        pub = tmp_path / "stat_fail"
+        pub.mkdir()
+        _os.environ["XDG_CACHE_HOME"] = str(pub.parent)
+        cache_mod._DB_PATH = None  # type: ignore[attr-defined]
+
+        original_stat = Path.stat
+
+        def bad_stat(self: Path, **kwargs: object) -> object:
+            if self == (pub.parent / "stat_fail").resolve():
+                raise OSError("simulated stat failure")
+            return original_stat(self, **kwargs)
+
+        monkeypatch.setattr(Path, "stat", bad_stat)
+        try:
+            result = cache_mod.get_db_path()
+            assert result is not None
+        finally:
+            _os.environ.pop("XDG_CACHE_HOME", None)
+            cache_mod.set_db_path(tmp_path / "test_cache.db")
+
+
 class TestInit:
     def test_init_creates_tables(self, tmp_path: Path) -> None:
         cache_mod.init_db()

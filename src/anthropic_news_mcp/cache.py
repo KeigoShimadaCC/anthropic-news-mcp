@@ -23,12 +23,15 @@ def get_db_path() -> Path:
     path = Path(cache_home) / "anthropic-news-mcp" / "cache.db"
     path.parent.mkdir(parents=True, exist_ok=True)
     resolved = path.parent.resolve()
-    if resolved.stat().st_mode & 0o007:
-        warnings.warn(
-            f"Cache directory {resolved} is world-readable; "
-            "set XDG_CACHE_HOME to a private directory to restrict access.",
-            stacklevel=2,
-        )
+    try:
+        if resolved.stat().st_mode & 0o007:
+            warnings.warn(
+                f"Cache directory {resolved} is world-readable; "
+                "set XDG_CACHE_HOME to a private directory to restrict access.",
+                stacklevel=2,
+            )
+    except OSError:
+        pass
     return path
 
 

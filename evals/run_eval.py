@@ -16,6 +16,7 @@ Requires:
 
 import argparse
 import asyncio
+import html as html_lib
 import json
 import os
 import subprocess
@@ -133,9 +134,9 @@ def _judge(
 ) -> dict:  # type: ignore[type-arg]
     """Ask Haiku to score the response. Returns {tool_selection, faithfulness, helpfulness}."""
     tool_calls_str = json.dumps(tool_calls, indent=2) if tool_calls else "(none)"
-    expected_tool = golden.get("expected_tool", "any")
+    expected_tool = html_lib.escape(str(golden.get("expected_tool", "any")))
     expected_contains = golden.get("expected_response_must_contain_any", [])
-    rubric_notes = golden.get("rubric_notes", "")
+    rubric_notes = html_lib.escape(str(golden.get("rubric_notes", "")))
 
     judge_prompt = textwrap.dedent(f"""
         You are evaluating an AI assistant's response to a user prompt.

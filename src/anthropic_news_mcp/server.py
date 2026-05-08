@@ -63,8 +63,15 @@ async def get_recent_updates(
     Returns:
         {"items": [...NewsItem...], "sources": [...SourceHealth...]}
     """
-    if sources and len(sources) > 50:
-        return {"error": "Too many source keys — limit is 50 per request."}
+    if sources:
+        if len(sources) > 50:
+            return {"error": "Too many source keys — limit is 50 per request."}
+        valid_keys = {s.key for s in SOURCE_REGISTRY}
+        unknown = [k for k in sources if k not in valid_keys]
+        if unknown:
+            return {
+                "error": f"Unknown source keys: {unknown}. Use list_sources to see valid keys."
+            }
 
     parsed_since: datetime | None = None
     if since:

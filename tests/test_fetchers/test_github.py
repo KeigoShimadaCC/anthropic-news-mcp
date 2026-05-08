@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from anthropic_news_mcp.fetchers.github_events import _parse_events
-from anthropic_news_mcp.fetchers.github_releases import _parse_releases
+from anthropic_news_mcp.fetchers.github_releases import GitHubReleasesFetcher, _parse_releases
 from anthropic_news_mcp.models import Category, Source
 
 RELEASES_FIXTURE = Path(__file__).parent.parent / "fixtures" / "github_releases.json"
@@ -76,6 +76,49 @@ class TestGitHubReleases:
         ]
         items = _parse_releases(data, "anthropics/anthropic-sdk-python")
         assert Category.MODELS in items[0].category
+
+    @pytest.mark.asyncio
+    async def test_fetch_without_github_token_uses_unauthenticated_requests(
+        self, monkeypatch
+    ):
+        calls = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return []
+
+        class FakeClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return None
+
+            async def get(self, url):
+                calls.append(url)
+                return FakeResponse()
+
+        def fake_get_client(**kwargs):
+            calls.append(kwargs)
+            return FakeClient()
+
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.setattr(
+            "anthropic_news_mcp.fetchers.github_releases.get_client",
+            fake_get_client,
+        )
+
+        with pytest.warns(UserWarning, match="GITHUB_TOKEN not set"):
+            items = await GitHubReleasesFetcher().fetch()
+
+        assert items == []
+        assert calls[0] == {"headers": {}}
+        assert len(calls) == 5  # client kwargs + four repo requests
 
 
 class TestGitHubOrgEvents:

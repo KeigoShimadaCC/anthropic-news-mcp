@@ -3,7 +3,7 @@
 import asyncio
 import re
 from datetime import datetime
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 from . import cache
 from .config import SOURCE_REGISTRY, SourceConfig
@@ -13,9 +13,13 @@ _UTM_RE = re.compile(r"utm_[a-z_]+", re.IGNORECASE)
 
 
 def _canonicalize_url(url: str) -> str:
-    """Normalize URL for dedup: drop fragments, utm_* params, sort remaining params."""
+    """Normalize URL for dedup: drop fragments, utm_* params, decode and sort remaining params."""
     parsed = urlparse(url)
-    params = [(k, v) for k, v in parse_qsl(parsed.query) if not _UTM_RE.match(k)]
+    params = [
+        (unquote(k), unquote(v))
+        for k, v in parse_qsl(parsed.query)
+        if not _UTM_RE.match(k)
+    ]
     params.sort()
     normalized = parsed._replace(fragment="", query=urlencode(params))
     return urlunparse(normalized)

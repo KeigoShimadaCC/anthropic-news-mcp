@@ -37,8 +37,14 @@ def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
         if not title:
             continue
 
-        ups = int(post.get("ups") or 0)  # type: ignore[arg-type]
-        num_comments = int(post.get("num_comments") or 0)  # type: ignore[arg-type]
+        try:
+            ups = int(float(post.get("ups") or 0))  # type: ignore[arg-type]
+        except (ValueError, TypeError):
+            ups = 0
+        try:
+            num_comments = int(float(post.get("num_comments") or 0))  # type: ignore[arg-type]
+        except (ValueError, TypeError):
+            num_comments = 0
         selftext = _decode(_strip_html(str(post.get("selftext") or "")))
 
         if selftext.strip():
@@ -47,7 +53,10 @@ def _parse_subreddit(data: dict[str, object], subreddit: str) -> list[NewsItem]:
             summary = f"{ups} upvotes · {num_comments} comments"
 
         created_utc = float(post.get("created_utc") or 0)  # type: ignore[arg-type]
-        published_at = datetime.fromtimestamp(created_utc, tz=timezone.utc)
+        try:
+            published_at = datetime.fromtimestamp(created_utc, tz=timezone.utc)
+        except (ValueError, OSError, OverflowError):
+            published_at = datetime.now(tz=timezone.utc)
 
         permalink = str(post.get("permalink") or "")
         url = f"https://reddit.com{permalink}"

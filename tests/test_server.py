@@ -176,6 +176,17 @@ async def test_get_recent_updates_too_many_sources() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_recent_updates_unknown_source_key_returns_error() -> None:
+    """Unknown source key must return an error, not a silent empty result."""
+    data = await _call(
+        "get_recent_updates",
+        {"sources": ["anthropic-newsroom-typo"]},
+    )
+    assert "error" in data
+    assert "anthropic-newsroom-typo" in data["error"]
+
+
+@pytest.mark.asyncio
 async def test_get_source_health_all_sources() -> None:
     from anthropic_news_mcp.config import SOURCE_REGISTRY
 
