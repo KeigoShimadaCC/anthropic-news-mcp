@@ -13,6 +13,7 @@ from .models import NewsItem, SourceHealth, SourceStatus
 CACHE_SCHEMA_VERSION = 1
 
 _DB_PATH: Path | None = None
+_db_initialized: bool = False
 
 
 def get_db_path() -> Path:
@@ -37,8 +38,9 @@ def get_db_path() -> Path:
 
 def set_db_path(path: Path) -> None:
     """Override the default db path — used in tests."""
-    global _DB_PATH
+    global _DB_PATH, _db_initialized
     _DB_PATH = path
+    _db_initialized = False
 
 
 @contextmanager
@@ -52,6 +54,10 @@ def _conn() -> Generator[sqlite3.Connection, None, None]:
 
 
 def init_db() -> None:
+    global _db_initialized
+    if _db_initialized:
+        return
+    _db_initialized = True
     with _conn() as db:
         db.execute("PRAGMA journal_mode = WAL")
         db.execute("""
@@ -174,22 +180,22 @@ def save_snapshot(
             """,
             (source_key, now, expires, status.value, len(items), error, items_json),
         )
-        # Also upsert individual item rows for search
-        for item in items:
-            db.execute(
-                """
-                INSERT OR REPLACE INTO items
-                    (id, source_key, url, published_at, payload_json)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    item.id,
-                    item.source_key,
-                    str(item.url),
-                    _dt_to_ms(item.published_at),
-                    item.model_dump_json(),
-                ),
+        # Sync items table: remove stale rows, then batch-insert current set
+        db.execute("DELETE FROM items WHERE source_key = ?", (source_key,))
+        rows = [
+            (
+                item.id,
+                item.source_key,
+                str(item.url),
+                _dt_to_ms(item.published_at),
+                item.model_dump_json(),
             )
+            for item in items
+        ]
+        db.executemany(
+            "INSERT OR REPLACE INTO items (id, source_key, url, published_at, payload_json) VALUES (?, ?, ?, ?, ?)",
+            rows,
+        )
         db.commit()
 
 
@@ -212,7 +218,7 @@ def get_all_snapshots() -> list[SourceHealth]:
 
 
 def search_items(query: str, limit: int = 10) -> list[NewsItem]:
-    """Case-insensitive substring search across title, summary, and tags."""
+    """Case-insensitive substring search across all cached item fields."""
     init_db()
     # Escape LIKE metacharacters so user input is treated as a literal substring,
     # not a wildcard pattern. Without this, query="_" matches every row.

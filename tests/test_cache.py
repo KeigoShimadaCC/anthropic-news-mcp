@@ -291,6 +291,14 @@ class TestSearch:
         assert len(results) == 3
 
 
+class TestSnapshotClearsStaleItems:
+    def test_save_snapshot_clears_stale_items(self) -> None:
+        cache_mod.save_snapshot("anthropic-newsroom", [_item("x"), _item("y")], ttl_seconds=3600)
+        cache_mod.save_snapshot("anthropic-newsroom", [_item("z")], ttl_seconds=3600)
+        assert cache_mod.search_items("Title x") == []
+        assert len(cache_mod.search_items("Title z")) == 1
+
+
 class TestGetAllSnapshots:
     def test_returns_all_sources(self) -> None:
         cache_mod.save_snapshot("src-x", [_item("x1")], ttl_seconds=3600)
