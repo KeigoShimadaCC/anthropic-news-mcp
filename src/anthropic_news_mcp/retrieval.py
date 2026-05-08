@@ -96,11 +96,11 @@ async def get_recent_updates(
         results = await asyncio.gather(
             *[_fetch_source(c) for c in targets_stale], return_exceptions=True
         )
-        for r in results:
-            if isinstance(r, Exception):
-                _log.warning("_fetch_source raised unexpectedly: %r", type(r).__name__)
+        for result in results:
+            if isinstance(result, Exception):
+                _log.warning("_fetch_source raised unexpectedly: %r", type(result).__name__)
                 continue
-            stale_results.append(r)
+            stale_results.append(result)
 
     # Pull fresh sources from cache
     fresh_results: list[tuple[list[NewsItem], SourceHealth]] = []
