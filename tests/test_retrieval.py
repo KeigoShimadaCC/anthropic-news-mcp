@@ -2,12 +2,19 @@
 
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from anthropic_news_mcp import cache as cache_mod
 from anthropic_news_mcp.models import Category, NewsItem, Source, SourceStatus
-from anthropic_news_mcp.retrieval import _canonicalize_url, get_health, get_recent_updates
+from anthropic_news_mcp.retrieval import (
+    _canonicalize_url,
+    _sanitize_error,
+    get_health,
+    get_recent_updates,
+    search_updates,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -195,6 +202,64 @@ class TestGetRecentUpdates:
     async def test_unknown_source_key_returns_empty(self):
         result, _ = await get_recent_updates(sources=["nonexistent-source"])
         assert result == []
+
+
+class TestSearchUpdates:
+    @pytest.mark.asyncio
+    async def test_cold_cache_search_self_warms(self, monkeypatch: pytest.MonkeyPatch):
+        class WarmFetcher:
+            async def fetch(self) -> list[NewsItem]:
+                return [
+                    _make_item(
+                        "warm-1",
+                        "https://anthropic.com/news/warm-1",
+                        published_at=datetime(2026, 5, 1, tzinfo=UTC),
+                    )
+                ]
+
+        from anthropic_news_mcp.config import SourceConfig
+
+        monkeypatch.setattr(
+            "anthropic_news_mcp.retrieval.SOURCE_REGISTRY",
+            [SourceConfig("anthropic-newsroom", WarmFetcher, 3600, [Category.MODELS])],
+        )
+        results = await search_updates("warm")
+        assert [item.id for item in results] == ["warm-1"]
+
+
+class TestSanitizeError:
+    def test_redacts_query_tokens_headers_and_key_values(self):
+        error = RuntimeError(
+            "GET https://example.com/path?api_key=secret failed "
+            "Authorization: Bearer abc123 token=def456 client_secret=hunter2"
+        )
+        message = _sanitize_error(error)
+        assert "api_key=secret" not in message
+        assert "abc123" not in message
+        assert "def456" not in message
+        assert "hunter2" not in message
+        assert "?[redacted]" in message
+
+
+class TestFetchSourceFailure:
+    @pytest.mark.asyncio
+    async def test_fetch_source_failure_falls_back_to_stale(self):
+        """When a fetcher raises, stale cached items are returned with STALE status."""
+        items = [_make_item("stale1", "https://anthropic.com/stale1")]
+        cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=0)
+
+        with patch(
+            "anthropic_news_mcp.fetchers.newsroom.NewsroomFetcher.fetch",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("network down"),
+        ):
+            result, healths = await get_recent_updates(sources=["anthropic-newsroom"])
+
+        assert len(result) == 1
+        assert result[0].id == "stale1"
+        newsroom_health = next(h for h in healths if h.key == "anthropic-newsroom")
+        assert newsroom_health.status == SourceStatus.STALE
+        assert newsroom_health.error is not None
 
 
 class TestGetHealth:

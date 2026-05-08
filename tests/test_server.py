@@ -72,7 +72,9 @@ async def test_list_sources_returns_all() -> None:
     assert "anthropic-trust-policy" in keys
     assert "hn-anthropic" in keys
     assert "reddit-claude" in keys
-    assert len(keys) == 16  # All configured sources
+    from anthropic_news_mcp.config import SOURCE_REGISTRY
+
+    assert set(keys) == {s.key for s in SOURCE_REGISTRY}
 
 
 @pytest.mark.asyncio
@@ -225,6 +227,32 @@ async def test_get_recent_updates_unknown_source_key_returns_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_recent_updates_rejects_date_only_since() -> None:
+    _seed("anthropic-newsroom", n=2)
+    data = await _call(
+        "get_recent_updates",
+        {"sources": ["anthropic-newsroom"], "since": "2026-05-01"},
+    )
+    assert "error" in data
+    assert "timezone-aware" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_recent_updates_rejects_bad_limit() -> None:
+    data = await _call("get_recent_updates", {"limit": 0})
+    assert data["error"] == "limit must be greater than zero."
+
+
+@pytest.mark.asyncio
+async def test_search_updates_rejects_blank_query_and_bad_limit() -> None:
+    data = await _call("search_updates", {"query": "   "})
+    assert data["error"] == "query must not be blank."
+
+    data = await _call("search_updates", {"query": "claude", "limit": -1})
+    assert data["error"] == "limit must be greater than zero."
+
+
+@pytest.mark.asyncio
 async def test_get_source_health_all_sources() -> None:
     from anthropic_news_mcp.config import SOURCE_REGISTRY
 
@@ -232,3 +260,62 @@ async def test_get_source_health_all_sources() -> None:
     returned_keys = {s["key"] for s in data["sources"]}
     configured_keys = {s.key for s in SOURCE_REGISTRY}
     assert configured_keys == returned_keys
+
+
+def test_tool_contracts_have_annotations_and_output_schemas() -> None:
+    from anthropic_news_mcp.server import mcp
+
+    by_name = {tool.name: tool for tool in mcp._tool_manager.list_tools()}  # noqa: SLF001
+    for name in [
+        "ping",
+        "list_sources",
+        "get_recent_updates",
+        "search_updates",
+        "get_source_health",
+    ]:
+        tool = by_name[name]
+        assert tool.annotations is not None
+        assert tool.annotations.readOnlyHint is True
+        assert tool.annotations.destructiveHint is False
+        assert tool.fn_metadata.output_schema is not None
+
+    assert by_name["get_recent_updates"].annotations.openWorldHint is True
+    assert by_name["search_updates"].annotations.openWorldHint is True
+    assert "limit" in by_name["get_recent_updates"].parameters["properties"]
+
+
+@pytest.mark.asyncio
+async def test_resources_and_prompts_registered() -> None:
+    from anthropic_news_mcp.server import mcp
+
+    resources = {str(resource.uri) for resource in mcp._resource_manager.list_resources()}  # noqa: SLF001
+    templates = {template.uri_template for template in mcp._resource_manager.list_templates()}  # noqa: SLF001
+    prompts = {prompt.name for prompt in mcp._prompt_manager.list_prompts()}  # noqa: SLF001
+
+    assert "anthropic-news://sources" in resources
+    assert "anthropic-news://health" in resources
+    assert "anthropic-news://source/{source_key}/latest" in templates
+    assert {
+        "latest_update_digest",
+        "source_health_report",
+        "weekly_category_digest",
+    }.issubset(prompts)
+
+    source_resource = await mcp._resource_manager.get_resource("anthropic-news://sources")  # noqa: SLF001
+    assert source_resource is not None
+    source_payload = json.loads(await source_resource.read())
+    assert "anthropic-newsroom" in {source["key"] for source in source_payload["sources"]}
+
+    _seed("anthropic-newsroom", n=1)
+    latest_resource = await mcp._resource_manager.get_resource(  # noqa: SLF001
+        "anthropic-news://source/anthropic-newsroom/latest"
+    )
+    assert latest_resource is not None
+    latest_payload = json.loads(await latest_resource.read())
+    assert latest_payload["items"][0]["source_key"] == "anthropic-newsroom"
+
+    messages = await mcp._prompt_manager.render_prompt(  # noqa: SLF001
+        "weekly_category_digest",
+        {"category": "models", "since": "2026-05-01T00:00:00Z"},
+    )
+    assert "get_recent_updates" in messages[0].content.text
