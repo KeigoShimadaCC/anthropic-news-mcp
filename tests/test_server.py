@@ -414,3 +414,61 @@ async def test_research_detail_search_session_and_claim_flow(
         {"claims": ["Claude Code shipped citations"], "evidence_ids": [evidence_id]},
     )
     assert evaluation["results"][0]["support"] in {"strong_support", "weak_support"}
+
+
+@pytest.mark.asyncio
+async def test_compare_updates_returns_new_items() -> None:
+    _seed("anthropic-newsroom", n=2)
+    data = await _call("compare_updates", {})
+    assert "new_items" in data
+    assert "changed_items" in data
+    assert "disappeared_items" in data
+    assert len(data["new_items"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_compare_updates_since_filters_old_items() -> None:
+    _seed("anthropic-newsroom", n=2)
+    data = await _call("compare_updates", {"since": "2099-01-01T00:00:00Z"})
+    assert data["new_items"] == []
+    assert data["changed_items"] == []
+
+
+@pytest.mark.asyncio
+async def test_build_digest_context_returns_timeline() -> None:
+    _seed("anthropic-newsroom", n=2)
+    data = await _call(
+        "build_digest_context",
+        {"topic": "anthropic", "since": "2026-01-01T00:00:00Z"},
+    )
+    assert "timeline" in data
+    assert data["topic"] == "anthropic"
+    assert "instructions" in data
+
+
+@pytest.mark.asyncio
+async def test_search_web_sources_rejects_inverted_time_range() -> None:
+    data = await _call(
+        "search_web_sources",
+        {
+            "query": "claude",
+            "since": "2026-05-03T00:00:00Z",
+            "until": "2026-05-01T00:00:00Z",
+        },
+    )
+    assert "error" in data
+    assert "since" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_timeline_rejects_inverted_time_range() -> None:
+    data = await _call(
+        "get_timeline",
+        {
+            "topic": "claude",
+            "since": "2026-05-03T00:00:00Z",
+            "until": "2026-05-01T00:00:00Z",
+        },
+    )
+    assert "error" in data
+    assert "since" in data["error"]

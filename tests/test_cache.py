@@ -375,3 +375,137 @@ class TestResearchPersistence:
         assert cache_mod.get_research_session("sess1") == session
         assert cache_mod.get_research_notes("sess1") == [note]
         assert cache_mod.get_research_reports("sess1") == [report]
+
+
+class TestGetItem:
+    def test_returns_item_by_id(self) -> None:
+        item = _item("gi-1")
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        result = cache_mod.get_item("gi-1")
+        assert result is not None
+        assert result.id == "gi-1"
+
+    def test_returns_none_for_unknown_id(self) -> None:
+        assert cache_mod.get_item("nonexistent-id") is None
+
+
+class TestGetAllItems:
+    def test_returns_items_from_multiple_sources(self) -> None:
+        cache_mod.save_snapshot("src-a", [_item("all-1")], ttl_seconds=3600)
+        cache_mod.save_snapshot("src-b", [_item("all-2"), _item("all-3")], ttl_seconds=3600)
+        result = cache_mod.get_all_items()
+        ids = {item.id for item in result}
+        assert {"all-1", "all-2", "all-3"}.issubset(ids)
+
+    def test_empty_when_no_data(self) -> None:
+        assert cache_mod.get_all_items() == []
+
+
+class TestGetAllContentDetails:
+    def test_returns_all_details(self) -> None:
+        item1 = _item("cd-1")
+        item2 = _item("cd-2")
+        cache_mod.save_snapshot("anthropic-newsroom", [item1, item2], ttl_seconds=3600)
+        for item in (item1, item2):
+            cache_mod.save_content_detail(
+                ContentDetail(
+                    item_id=item.id,
+                    url=item.url,
+                    normalized_text=f"Text for {item.id}",
+                    retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    content_hash=f"hash-{item.id}",
+                    content_type="text/html",
+                )
+            )
+        result = cache_mod.get_all_content_details()
+        assert {d.item_id for d in result} == {"cd-1", "cd-2"}
+
+    def test_empty_when_no_details(self) -> None:
+        assert cache_mod.get_all_content_details() == []
+
+
+class TestSearchDetails:
+    def test_finds_matching_text(self) -> None:
+        item = _item("sd-1")
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        cache_mod.save_content_detail(
+            ContentDetail(
+                item_id=item.id,
+                url=item.url,
+                normalized_text="Unique phrase about constitutional AI research.",
+                retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
+                content_hash="hash-sd-1",
+                content_type="text/html",
+            )
+        )
+        results = cache_mod.search_details("constitutional", limit=10)
+        assert len(results) == 1
+        assert results[0].item_id == "sd-1"
+
+    def test_no_match_returns_empty(self) -> None:
+        item = _item("sd-2")
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        cache_mod.save_content_detail(
+            ContentDetail(
+                item_id=item.id,
+                url=item.url,
+                normalized_text="Some unrelated content.",
+                retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
+                content_hash="hash-sd-2",
+                content_type="text/html",
+            )
+        )
+        assert cache_mod.search_details("xyzzy_nomatch", limit=10) == []
+
+
+class TestGetEvidenceMany:
+    def test_returns_requested_excerpts(self) -> None:
+        item = _item("em-1")
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        excerpts = [
+            EvidenceExcerpt(
+                evidence_id=f"ev-{i}",
+                item_id=item.id,
+                url=item.url,
+                title=item.title,
+                source_key=item.source_key,
+                source_type=SourceType.OFFICIAL,
+                evidence_tier=EvidenceTier.HIGH,
+                text=f"Excerpt text {i}",
+                start_char=i * 100,
+                end_char=i * 100 + 50,
+                retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
+                content_hash="hash-em",
+            )
+            for i in range(3)
+        ]
+        cache_mod.save_evidence_excerpts(excerpts)
+        result = cache_mod.get_evidence_many(["ev-0", "ev-2"])
+        ids = {e.evidence_id for e in result}
+        assert ids == {"ev-0", "ev-2"}
+
+    def test_skips_missing_ids(self) -> None:
+        result = cache_mod.get_evidence_many(["does-not-exist"])
+        assert result == []
+
+
+class TestGetItemHistorySince:
+    def test_returns_history_rows_for_seeded_items(self) -> None:
+        cache_mod.save_snapshot("anthropic-newsroom", [_item("hist-1")], ttl_seconds=3600)
+        rows = cache_mod.get_item_history_since(None)
+        assert len(rows) == 1
+        assert rows[0]["item"].id == "hist-1"
+        assert "first_seen_at" in rows[0]
+        assert "last_changed_at" in rows[0]
+
+    def test_since_filters_out_older_entries(self) -> None:
+        cache_mod.save_snapshot("anthropic-newsroom", [_item("hist-2")], ttl_seconds=3600)
+        future = datetime(2099, 1, 1, tzinfo=UTC)
+        rows = cache_mod.get_item_history_since(future)
+        assert rows == []
+
+    def test_respects_limit(self) -> None:
+        items = [_item(f"hist-lim-{i}") for i in range(5)]
+        cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=3600)
+        rows = cache_mod.get_item_history_since(None, limit=2)
+        assert len(rows) == 2
