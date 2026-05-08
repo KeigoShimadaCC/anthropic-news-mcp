@@ -63,6 +63,9 @@ async def get_recent_updates(
     Returns:
         {"items": [...NewsItem...], "sources": [...SourceHealth...]}
     """
+    if sources and len(sources) > 50:
+        return {"error": "Too many source keys — limit is 50 per request."}
+
     parsed_since: datetime | None = None
     if since:
         try:
@@ -70,7 +73,21 @@ async def get_recent_updates(
         except ValueError:
             pass
 
-    parsed_categories = [Category(c) for c in (categories or [])] if categories else None
+    parsed_categories: list[Category] | None = None
+    if categories:
+        valid: list[Category] = []
+        invalid: list[str] = []
+        for c in categories:
+            try:
+                valid.append(Category(c))
+            except ValueError:
+                invalid.append(c)
+        if invalid:
+            valid_values = [cat.value for cat in Category]
+            return {
+                "error": f"Unknown categories: {invalid}. Valid values: {valid_values}"
+            }
+        parsed_categories = valid or None
 
     items, healths = await _get_recent_updates(
         sources=sources,

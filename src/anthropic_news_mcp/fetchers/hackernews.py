@@ -1,5 +1,6 @@
 """Fetcher for Hacker News stories mentioning Anthropic/Claude."""
 
+import re
 from datetime import datetime, timezone
 
 from ..http import get_client
@@ -38,9 +39,6 @@ def _parse_hn(data: dict[str, object]) -> list[NewsItem]:
         story_text = str(hit.get("story_text") or "")
 
         if story_text:
-            # strip HTML tags from story_text
-            import re
-
             summary = re.sub(r"<[^>]+>", "", story_text)[:400]
         else:
             summary = f"{points} points · {num_comments} comments on Hacker News"

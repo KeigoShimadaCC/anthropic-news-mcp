@@ -152,6 +152,30 @@ async def test_search_updates_no_match() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_recent_updates_invalid_category_graceful() -> None:
+    """Unknown category values must return an error dict, not raise an exception."""
+    _seed("anthropic-newsroom", n=2)
+    data = await _call(
+        "get_recent_updates",
+        {"sources": ["anthropic-newsroom"], "categories": ["not-a-real-category"]},
+    )
+    assert "error" in data
+    assert "not-a-real-category" in data["error"]
+    # Valid keys should be listed in the error
+    assert "models" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_recent_updates_too_many_sources() -> None:
+    """Passing more than 50 source keys must return a descriptive error."""
+    data = await _call(
+        "get_recent_updates",
+        {"sources": [f"src-{i}" for i in range(51)]},
+    )
+    assert "error" in data
+
+
+@pytest.mark.asyncio
 async def test_get_source_health_all_sources() -> None:
     from anthropic_news_mcp.config import SOURCE_REGISTRY
 

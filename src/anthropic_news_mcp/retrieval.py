@@ -21,6 +21,12 @@ def _canonicalize_url(url: str) -> str:
     return urlunparse(normalized)
 
 
+def _sanitize_error(exc: Exception) -> str:
+    """Truncate error string and strip query params (may contain auth tokens)."""
+    msg = re.sub(r"\?[^\s]*", "?[redacted]", str(exc))
+    return msg[:200]
+
+
 async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHealth]:
     """Fetch one source, updating the cache. Returns (items, health)."""
     try:
@@ -28,10 +34,11 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
         items = await fetcher.fetch()
         cache.save_snapshot(config.key, items, config.ttl_seconds, SourceStatus.LIVE)
         health = cache.get_snapshot(config.key)
-        assert health is not None
+        if health is None:
+            raise RuntimeError(f"Cache write for {config.key!r} did not persist")
         return items, health
     except Exception as exc:
-        error_msg = str(exc)
+        error_msg = _sanitize_error(exc)
         # Preserve last-known items from cache even on failure
         cached_items = cache.get_cached_items(config.key)
         status = SourceStatus.STALE if cached_items else SourceStatus.DOWN
@@ -43,7 +50,8 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
             error=error_msg,
         )
         health = cache.get_snapshot(config.key)
-        assert health is not None
+        if health is None:
+            raise RuntimeError(f"Cache write for {config.key!r} did not persist")
         return cached_items, health
 
 
