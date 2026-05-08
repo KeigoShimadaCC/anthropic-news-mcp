@@ -50,7 +50,7 @@ MCP client → server.py (tool handlers)
 
 ### Key modules
 
-- **`server.py`** — Four MCP tools: `ping`, `list_sources`, `get_recent_updates`, `search_updates`, `get_source_health`. Tool functions are named with `_get_recent_updates` / `_search_updates` (underscore-prefixed imports) to avoid shadowing the retrieval functions they call.
+- **`server.py`** — Five MCP tools: `ping`, `list_sources`, `get_recent_updates`, `search_updates`, `get_source_health`. Tool functions are named with `_get_recent_updates` / `_search_updates` (underscore-prefixed imports) to avoid shadowing the retrieval functions they call.
 
 - **`retrieval.py`** — `get_recent_updates()` checks TTLs: fresh sources are served from cache, stale/missing sources are fetched concurrently via `asyncio.gather(..., return_exceptions=True)`. Items are deduplicated by canonical URL (fragments + `utm_*` params stripped, remaining params sorted).
 
@@ -70,7 +70,7 @@ MCP client → server.py (tool handlers)
 
 ### Testing approach
 
-All 107 tests are **offline** — no live HTTP. Fetcher tests parse frozen fixtures from `tests/fixtures/`. Cache tests use `set_db_path(tmp_path / "test.db")` via an `autouse` fixture. Server integration tests call `await mcp.call_tool(name, args)` directly (FastMCP 1.27 in-process API); the return value is a `(list[content], raw_dict)` tuple — extract `result[0][0].text` to get the JSON string.
+All 146+ tests are **offline** — no live HTTP. Fetcher tests parse frozen fixtures from `tests/fixtures/`. Cache tests use `set_db_path(tmp_path / "test.db")` via an `autouse` fixture. Server integration tests call `await mcp.call_tool(name, args)` directly (FastMCP 1.27 in-process API); the return value is a `(list[content], raw_dict)` tuple — extract `result[0][0].text` to get the JSON string.
 
 ### Eval harness
 
