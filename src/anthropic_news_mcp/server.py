@@ -772,10 +772,24 @@ def _emit_startup_telemetry() -> None:
 
 
 def main() -> None:
+    from .analytics import capture, init_analytics
     from .sentry import init_sentry
 
     init_sentry()
+    init_analytics()
     _emit_startup_telemetry()
+    capture(
+        "server_startup",
+        {
+            "version": __version__,
+            "python": sys.version.split()[0],
+            "platform": platform.system(),
+            "source_count": len(SOURCE_REGISTRY),
+            "remote_transport": FLAGS.enable_remote_transport,
+        },
+    )
+    if FLAGS.enable_remote_transport:
+        _log.info("Remote transport enabled — starting ASGI server")
     mcp.run()
 
 

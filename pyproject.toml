@@ -24,7 +24,7 @@ remote = [
     "starlette>=0.37.0",
     "uvicorn>=0.30.0",
 ]
-observability = ["sentry-sdk>=2.0.0"]
+observability = ["sentry-sdk>=2.0.0", "posthog>=3.0.0"]
 dev = [
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",
@@ -60,4 +60,4 @@ addopts = "--durations=10"
 extend_exclude = ["evals/", "vulture_whitelist.py"]
 
 [tool.deptry.per_rule_ignores]
-DEP002 = ["anthropic", "PyYAML", "uvicorn", "pytest", "pytest-asyncio", "pytest-cov", "mypy", "ruff", "pre-commit", "radon", "vulture", "pylint", "deptry", "pdoc", "sentry-sdk"]
+DEP002 = ["anthropic", "PyYAML", "uvicorn", "pytest", "pytest-asyncio", "pytest-cov", "mypy", "ruff", "pre-commit", "radon", "vulture", "pylint", "deptry", "pdoc", "sentry-sdk", "posthog"]
