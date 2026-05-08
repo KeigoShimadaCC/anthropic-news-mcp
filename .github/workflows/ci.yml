@@ -20,6 +20,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
+          cache-dependency-glob: pyproject.toml
 
       - name: Install dependencies
         run: uv pip install -e ".[dev]" --system
@@ -34,7 +35,7 @@ jobs:
         run: ruff format --check .
 
       - name: Type check (mypy)
-        run: mypy --strict -p anthropic_news_mcp
+        run: mypy --strict src/anthropic_news_mcp/*.py src/anthropic_news_mcp/fetchers/*.py
 
       - name: Tests
         run: pytest -q

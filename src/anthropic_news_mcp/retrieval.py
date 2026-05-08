@@ -80,13 +80,28 @@ async def _fetch_source(config: SourceConfig) -> tuple[list[NewsItem], SourceHea
         fetcher = config.fetcher_cls()
         items = await fetcher.fetch()
         cache.save_snapshot(config.key, items, config.ttl_seconds, SourceStatus.LIVE)
+        _log.info(
+            "source_fetch_succeeded",
+            extra={
+                "source_key": config.key,
+                "item_count": len(items),
+                "status": SourceStatus.LIVE.value,
+            },
+        )
         health = cache.get_snapshot(config.key)
         if health is None:
             raise RuntimeError(f"Cache write for {config.key!r} did not persist")
         return items, health
     except Exception as exc:
         error_msg = _sanitize_error(exc)
-        _log.warning("fetch failed for %r: %s", config.key, error_msg)
+        _log.warning(
+            "source_fetch_failed",
+            extra={
+                "source_key": config.key,
+                "error": error_msg,
+                "exception_type": type(exc).__name__,
+            },
+        )
         # Preserve last-known items from cache even on failure
         cached_items = cache.get_cached_items(config.key)
         status = SourceStatus.STALE if cached_items else SourceStatus.DOWN
