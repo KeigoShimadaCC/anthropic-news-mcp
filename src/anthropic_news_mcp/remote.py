@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from dataclasses import dataclass
-from time import time
 from typing import Any, cast
 
 from mcp.server.auth.provider import AccessToken, TokenVerifier
@@ -17,6 +18,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from .server import mcp
+
+_log = logging.getLogger(__name__)
 
 
 def _csv_env(name: str) -> list[str]:
@@ -88,8 +91,18 @@ class OIDCJWTVerifier(TokenVerifier):
         self._config = config
 
     async def verify_token(self, token: str) -> AccessToken | None:
+        loop = asyncio.get_event_loop()
         try:
-            signing_key = self._jwks.get_signing_key_from_jwt(token)
+            signing_key = await loop.run_in_executor(
+                None, self._jwks.get_signing_key_from_jwt, token
+            )
+        except Exception:
+            _log.warning(
+                "JWKS key lookup failed — all tokens will be rejected until resolved",
+                exc_info=True,
+            )
+            return None
+        try:
             claims = self._jwt.decode(
                 token,
                 signing_key.key,
@@ -103,8 +116,6 @@ class OIDCJWTVerifier(TokenVerifier):
 
         scopes = _extract_scopes(claims)
         expires_at = claims.get("exp")
-        if isinstance(expires_at, int) and expires_at < int(time()):
-            return None
         client_id = str(claims.get("client_id") or claims.get("azp") or claims.get("sub") or "")
         if not client_id:
             return None

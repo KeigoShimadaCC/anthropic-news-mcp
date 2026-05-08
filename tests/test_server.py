@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from anthropic_news_mcp import cache as cache_mod
-from anthropic_news_mcp.models import Category, NewsItem, Source
+from anthropic_news_mcp.models import Category, ContentDetail, NewsItem, Source
 
 
 @pytest.fixture(autouse=True)
@@ -266,21 +266,38 @@ def test_tool_contracts_have_annotations_and_output_schemas() -> None:
     from anthropic_news_mcp.server import mcp
 
     by_name = {tool.name: tool for tool in mcp._tool_manager.list_tools()}  # noqa: SLF001
-    for name in [
+    read_only_tools = [
         "ping",
         "list_sources",
         "get_recent_updates",
         "search_updates",
         "get_source_health",
-    ]:
+        "get_update_detail",
+        "search_web_sources",
+        "get_timeline",
+        "compare_updates",
+        "build_digest_context",
+        "get_research_session",
+        "evaluate_claims",
+    ]
+    for name in read_only_tools:
         tool = by_name[name]
         assert tool.annotations is not None
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False
         assert tool.fn_metadata.output_schema is not None
 
+    for name in ["create_research_session", "save_research_note", "save_research_report"]:
+        tool = by_name[name]
+        assert tool.annotations is not None
+        assert tool.annotations.readOnlyHint is False
+        assert tool.annotations.destructiveHint is False
+        assert tool.fn_metadata.output_schema is not None
+
     assert by_name["get_recent_updates"].annotations.openWorldHint is True
     assert by_name["search_updates"].annotations.openWorldHint is True
+    assert by_name["get_update_detail"].annotations.openWorldHint is True
+    assert by_name["create_research_session"].annotations.readOnlyHint is False
     assert "limit" in by_name["get_recent_updates"].parameters["properties"]
 
 
@@ -295,10 +312,15 @@ async def test_resources_and_prompts_registered() -> None:
     assert "anthropic-news://sources" in resources
     assert "anthropic-news://health" in resources
     assert "anthropic-news://source/{source_key}/latest" in templates
+    assert "anthropic-news://evidence/{evidence_id}" in templates
+    assert "anthropic-news://session/{session_id}" in templates
     assert {
         "latest_update_digest",
         "source_health_report",
         "weekly_category_digest",
+        "generate_digest",
+        "verify_claims_against_evidence",
+        "research_session_brief",
     }.issubset(prompts)
 
     source_resource = await mcp._resource_manager.get_resource("anthropic-news://sources")  # noqa: SLF001
@@ -319,3 +341,76 @@ async def test_resources_and_prompts_registered() -> None:
         {"category": "models", "since": "2026-05-01T00:00:00Z"},
     )
     assert "get_recent_updates" in messages[0].content.text
+
+
+@pytest.mark.asyncio
+async def test_research_detail_search_session_and_claim_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    item = _seed("anthropic-newsroom", n=1)[0]
+
+    async def fake_fetch_content_detail(news_item: NewsItem) -> ContentDetail:
+        return ContentDetail(
+            item_id=news_item.id,
+            url=news_item.url,
+            normalized_text="Claude Code shipped a research feature with citations and evidence.",
+            retrieved_at=datetime(2026, 5, 4, tzinfo=UTC),
+            content_hash="hash1",
+            content_type="text/html",
+        )
+
+    monkeypatch.setattr(
+        "anthropic_news_mcp.research.fetch_content_detail", fake_fetch_content_detail
+    )
+
+    detail = await _call("get_update_detail", {"id": item.id, "excerpt_query": "citations"})
+    assert detail["item"]["id"] == item.id
+    assert detail["detail"]["content_hash"] == "hash1"
+    assert detail["excerpts"]
+    evidence_id = detail["excerpts"][0]["evidence_id"]
+
+    search = await _call(
+        "search_web_sources",
+        {"query": "citations", "sources": ["anthropic-newsroom"], "refresh": False},
+    )
+    assert search["items"][0]["id"] == item.id
+
+    timeline = await _call(
+        "get_timeline",
+        {
+            "topic": "citations",
+            "since": "2026-05-01T00:00:00Z",
+            "sources": ["anthropic-newsroom"],
+        },
+    )
+    assert timeline["groups"]
+
+    session = await _call(
+        "create_research_session",
+        {"title": "Citation research", "topic": "citations"},
+    )
+    session_id = session["session"]["session_id"]
+    note = await _call(
+        "save_research_note",
+        {"session_id": session_id, "text": "Check citation support", "evidence_ids": [evidence_id]},
+    )
+    assert note["note"]["follow_up"] is False
+    report = await _call(
+        "save_research_report",
+        {
+            "session_id": session_id,
+            "title": "Digest",
+            "markdown": "Claude Code shipped citations.",
+            "evidence_ids": [evidence_id],
+        },
+    )
+    assert report["report"]["title"] == "Digest"
+    session_payload = await _call("get_research_session", {"session_id": session_id})
+    assert session_payload["notes"]
+    assert session_payload["reports"]
+
+    evaluation = await _call(
+        "evaluate_claims",
+        {"claims": ["Claude Code shipped citations"], "evidence_ids": [evidence_id]},
+    )
+    assert evaluation["results"][0]["support"] in {"strong_support", "weak_support"}

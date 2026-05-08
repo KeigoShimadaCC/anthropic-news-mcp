@@ -1,5 +1,6 @@
 """Fetcher for Anthropic GitHub org events (new repos, releases)."""
 
+import logging
 import os
 from datetime import UTC, datetime
 from typing import cast
@@ -7,6 +8,8 @@ from typing import cast
 from ..http import get_client
 from ..models import Category, NewsItem, Source
 from .base import Fetcher
+
+_log = logging.getLogger(__name__)
 
 _ORG_EVENTS_URL = "https://api.github.com/orgs/anthropics/events?per_page=50"
 
@@ -87,6 +90,10 @@ class GitHubOrgEventsFetcher(Fetcher):
         token = os.environ.get("GITHUB_TOKEN")
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        else:
+            _log.warning(
+                "GITHUB_TOKEN not set; GitHub Events API rate-limited to 60 req/hr unauthenticated"
+            )
 
         async with get_client(headers=headers) as client:
             resp = await client.get(_ORG_EVENTS_URL)

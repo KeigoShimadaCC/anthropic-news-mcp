@@ -97,7 +97,7 @@ async def get_recent_updates(
             *[_fetch_source(c) for c in targets_stale], return_exceptions=True
         )
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 _log.warning("_fetch_source raised unexpectedly: %r", type(result).__name__)
                 continue
             stale_results.append(result)

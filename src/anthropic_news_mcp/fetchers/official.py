@@ -543,6 +543,25 @@ def parse_status_payloads(
     return items
 
 
+_VALID_IMPACT_TAGS = frozenset({"none", "minor", "major", "critical", "maintenance"})
+_VALID_STATUS_TAGS = frozenset(
+    {
+        "investigating",
+        "identified",
+        "monitoring",
+        "resolved",
+        "scheduled",
+        "in_progress",
+        "verifying",
+        "completed",
+        "operational",
+        "degraded_performance",
+        "partial_outage",
+        "major_outage",
+    }
+)
+
+
 def _impact_to_importance(impact: str | None) -> Literal[1, 2, 3]:
     value = (impact or "none").lower()
     if value in {"critical", "major"}:
@@ -575,7 +594,12 @@ def _status_item(payload: dict[str, Any], *, source_key: str, kind: str) -> News
         category=[Category.OPS],
         published_at=published_at,
         importance=_impact_to_importance(impact),
-        tags=["status", kind, impact, str(status)],
+        tags=[
+            "status",
+            kind,
+            impact.lower() if impact.lower() in _VALID_IMPACT_TAGS else "unknown",
+            str(status).lower() if str(status).lower() in _VALID_STATUS_TAGS else "unknown",
+        ],
     )
 
 

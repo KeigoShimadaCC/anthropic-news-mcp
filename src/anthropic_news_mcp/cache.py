@@ -8,9 +8,18 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .models import NewsItem, SourceHealth, SourceStatus
+from .models import (
+    ContentDetail,
+    EvidenceExcerpt,
+    NewsItem,
+    ResearchNote,
+    ResearchReport,
+    ResearchSession,
+    SourceHealth,
+    SourceStatus,
+)
 
-CACHE_SCHEMA_VERSION = 1
+CACHE_SCHEMA_VERSION = 2
 
 _DB_PATH: Path | None = None
 _db_initialized: bool = False
@@ -22,7 +31,11 @@ def get_db_path() -> Path:
         return _DB_PATH
     override = os.environ.get("ANTHROPIC_NEWS_MCP_CACHE_DB")
     if override:
-        path = Path(override).expanduser()
+        path = Path(override).expanduser().resolve()
+        if not path.is_absolute():
+            raise RuntimeError(
+                f"ANTHROPIC_NEWS_MCP_CACHE_DB must resolve to an absolute path, got: {override!r}"
+            )
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
     cache_home = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
@@ -71,11 +84,8 @@ def init_db() -> None:
             )
         """)
         row = db.execute("SELECT version FROM schema_version").fetchone()
-        if row and row["version"] != CACHE_SCHEMA_VERSION:
-            # Drop and recreate on schema mismatch
-            db.execute("DROP TABLE IF EXISTS source_snapshots")
-            db.execute("DROP TABLE IF EXISTS items")
-            db.execute("DELETE FROM schema_version")
+        if row and row["version"] > CACHE_SCHEMA_VERSION:
+            raise RuntimeError(f"Unsupported cache schema version: {row['version']}")
 
         db.execute("""
             CREATE TABLE IF NOT EXISTS source_snapshots (
@@ -97,11 +107,84 @@ def init_db() -> None:
                 payload_json  TEXT NOT NULL
             )
         """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS content_details (
+                item_id         TEXT PRIMARY KEY,
+                url             TEXT NOT NULL,
+                normalized_text TEXT NOT NULL,
+                retrieved_at    INTEGER NOT NULL,
+                content_hash    TEXT NOT NULL,
+                content_type    TEXT NOT NULL,
+                truncated       INTEGER NOT NULL,
+                warnings_json   TEXT NOT NULL
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS evidence_excerpts (
+                evidence_id    TEXT PRIMARY KEY,
+                item_id        TEXT NOT NULL,
+                url            TEXT NOT NULL,
+                title          TEXT NOT NULL,
+                source_key     TEXT NOT NULL,
+                source_type    TEXT NOT NULL,
+                evidence_tier  TEXT NOT NULL,
+                text           TEXT NOT NULL,
+                start_char     INTEGER NOT NULL,
+                end_char       INTEGER NOT NULL,
+                retrieved_at   INTEGER NOT NULL,
+                content_hash   TEXT NOT NULL
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS item_history (
+                id              TEXT PRIMARY KEY,
+                item_id         TEXT NOT NULL,
+                first_seen_at   INTEGER NOT NULL,
+                last_seen_at    INTEGER NOT NULL,
+                last_changed_at INTEGER NOT NULL,
+                content_hash    TEXT,
+                payload_json    TEXT NOT NULL
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS research_sessions (
+                session_id   TEXT PRIMARY KEY,
+                title        TEXT NOT NULL,
+                topic        TEXT,
+                filters_json TEXT NOT NULL,
+                created_at   INTEGER NOT NULL,
+                updated_at   INTEGER NOT NULL
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS research_notes (
+                note_id           TEXT PRIMARY KEY,
+                session_id        TEXT NOT NULL,
+                text              TEXT NOT NULL,
+                evidence_ids_json TEXT NOT NULL,
+                follow_up         INTEGER NOT NULL,
+                created_at        INTEGER NOT NULL
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS research_reports (
+                report_id         TEXT PRIMARY KEY,
+                session_id        TEXT NOT NULL,
+                title             TEXT NOT NULL,
+                markdown          TEXT NOT NULL,
+                evidence_ids_json TEXT NOT NULL,
+                created_at        INTEGER NOT NULL
+            )
+        """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_items_source ON items(source_key)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_items_published ON items(published_at DESC)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_details_hash ON content_details(content_hash)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_item ON evidence_excerpts(item_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_history_item ON item_history(item_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_notes_session ON research_notes(session_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_reports_session ON research_reports(session_id)")
         db.execute(
-            "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
-            (CACHE_SCHEMA_VERSION,),
+            "INSERT OR IGNORE INTO schema_version (version) VALUES (?)", (CACHE_SCHEMA_VERSION,)
         )
         db.commit()
 
@@ -186,6 +269,35 @@ def save_snapshot(
             (source_key, now, expires, status.value, len(items), error, items_json),
         )
         # Sync items table: remove stale rows, then batch-insert current set
+        current_ids = {item.id for item in items}
+        old_rows = db.execute(
+            "SELECT id, payload_json FROM items WHERE source_key = ?", (source_key,)
+        ).fetchall()
+        now_ms = _now_ms()
+        for old_row in old_rows:
+            if old_row["id"] in current_ids:
+                continue
+            old_item = NewsItem.model_validate_json(old_row["payload_json"])
+            existing = db.execute(
+                "SELECT first_seen_at, content_hash FROM item_history WHERE item_id = ?",
+                (old_item.id,),
+            ).fetchone()
+            db.execute(
+                """
+                INSERT OR REPLACE INTO item_history
+                    (id, item_id, first_seen_at, last_seen_at, last_changed_at, content_hash, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    old_item.id,
+                    old_item.id,
+                    existing["first_seen_at"] if existing else now_ms,
+                    now_ms,
+                    now_ms,
+                    existing["content_hash"] if existing else None,
+                    old_item.model_dump_json(),
+                ),
+            )
         db.execute("DELETE FROM items WHERE source_key = ?", (source_key,))
         rows = [
             (
@@ -201,7 +313,398 @@ def save_snapshot(
             "INSERT OR REPLACE INTO items (id, source_key, url, published_at, payload_json) VALUES (?, ?, ?, ?, ?)",
             rows,
         )
+        # Batch-fetch existing history rows and content hashes for all items at once.
+        item_ids = [item.id for item in items]
+        placeholders = ",".join("?" * len(item_ids))
+        existing_history: dict[str, sqlite3.Row] = {}
+        if item_ids:
+            for row in db.execute(
+                f"SELECT item_id, first_seen_at, last_changed_at, content_hash FROM item_history WHERE item_id IN ({placeholders})",
+                item_ids,
+            ).fetchall():
+                existing_history[row["item_id"]] = row
+            content_hashes: dict[str, str | None] = {}
+            for row in db.execute(
+                f"SELECT item_id, content_hash FROM content_details WHERE item_id IN ({placeholders})",
+                item_ids,
+            ).fetchall():
+                content_hashes[row["item_id"]] = row["content_hash"]
+        history_rows = []
+        for item in items:
+            existing = existing_history.get(item.id)
+            detail_hash = content_hashes.get(item.id)
+            first_seen_at = existing["first_seen_at"] if existing else now_ms
+            if existing is None or existing["content_hash"] != detail_hash:
+                last_changed_at = now_ms
+            else:
+                last_changed_at = existing["last_changed_at"]
+            history_rows.append(
+                (
+                    item.id,
+                    item.id,
+                    first_seen_at,
+                    now_ms,
+                    last_changed_at,
+                    detail_hash,
+                    item.model_dump_json(),
+                )
+            )
+        db.executemany(
+            """
+            INSERT OR REPLACE INTO item_history
+                (id, item_id, first_seen_at, last_seen_at, last_changed_at, content_hash, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            history_rows,
+        )
         db.commit()
+
+
+def _detail_hash_for_db(db: sqlite3.Connection, item_id: str) -> str | None:
+    row = db.execute(
+        "SELECT content_hash FROM content_details WHERE item_id = ?", (item_id,)
+    ).fetchone()
+    return row["content_hash"] if row else None
+
+
+def get_item(item_id: str) -> NewsItem | None:
+    init_db()
+    with _conn() as db:
+        row = db.execute("SELECT payload_json FROM items WHERE id = ?", (item_id,)).fetchone()
+    if row is None:
+        return None
+    return NewsItem.model_validate_json(row["payload_json"])
+
+
+def get_all_items() -> list[NewsItem]:
+    init_db()
+    with _conn() as db:
+        rows = db.execute("SELECT payload_json FROM items ORDER BY published_at DESC").fetchall()
+    return [NewsItem.model_validate_json(row["payload_json"]) for row in rows]
+
+
+def save_content_detail(detail: ContentDetail) -> None:
+    init_db()
+    with _conn() as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO content_details
+                (item_id, url, normalized_text, retrieved_at, content_hash, content_type, truncated, warnings_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                detail.item_id,
+                str(detail.url),
+                detail.normalized_text,
+                _dt_to_ms(detail.retrieved_at),
+                detail.content_hash,
+                detail.content_type,
+                1 if detail.truncated else 0,
+                json.dumps(detail.warnings),
+            ),
+        )
+        db.commit()
+
+
+def get_content_detail(item_id: str) -> ContentDetail | None:
+    init_db()
+    with _conn() as db:
+        row = db.execute("SELECT * FROM content_details WHERE item_id = ?", (item_id,)).fetchone()
+    if row is None:
+        return None
+    return ContentDetail(
+        item_id=row["item_id"],
+        url=row["url"],
+        normalized_text=row["normalized_text"],
+        retrieved_at=_ms_to_dt(row["retrieved_at"]),
+        content_hash=row["content_hash"],
+        content_type=row["content_type"],
+        truncated=bool(row["truncated"]),
+        warnings=json.loads(row["warnings_json"]),
+    )
+
+
+def get_all_content_details() -> list[ContentDetail]:
+    """Return all cached content details (for batch pre-loading)."""
+    init_db()
+    with _conn() as db:
+        rows = db.execute("SELECT * FROM content_details").fetchall()
+    return [
+        ContentDetail(
+            item_id=row["item_id"],
+            url=row["url"],
+            normalized_text=row["normalized_text"],
+            retrieved_at=_ms_to_dt(row["retrieved_at"]),
+            content_hash=row["content_hash"],
+            content_type=row["content_type"],
+            truncated=bool(row["truncated"]),
+            warnings=json.loads(row["warnings_json"]),
+        )
+        for row in rows
+    ]
+
+
+def save_evidence_excerpts(excerpts: list[EvidenceExcerpt]) -> None:
+    init_db()
+    with _conn() as db:
+        db.executemany(
+            """
+            INSERT OR REPLACE INTO evidence_excerpts
+                (evidence_id, item_id, url, title, source_key, source_type, evidence_tier,
+                 text, start_char, end_char, retrieved_at, content_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    excerpt.evidence_id,
+                    excerpt.item_id,
+                    str(excerpt.url),
+                    excerpt.title,
+                    excerpt.source_key,
+                    excerpt.source_type.value,
+                    excerpt.evidence_tier.value,
+                    excerpt.text,
+                    excerpt.start_char,
+                    excerpt.end_char,
+                    _dt_to_ms(excerpt.retrieved_at),
+                    excerpt.content_hash,
+                )
+                for excerpt in excerpts
+            ],
+        )
+        db.commit()
+
+
+def _evidence_from_row(row: sqlite3.Row) -> EvidenceExcerpt:
+    return EvidenceExcerpt(
+        evidence_id=row["evidence_id"],
+        item_id=row["item_id"],
+        url=row["url"],
+        title=row["title"],
+        source_key=row["source_key"],
+        source_type=row["source_type"],
+        evidence_tier=row["evidence_tier"],
+        text=row["text"],
+        start_char=row["start_char"],
+        end_char=row["end_char"],
+        retrieved_at=_ms_to_dt(row["retrieved_at"]),
+        content_hash=row["content_hash"],
+    )
+
+
+def get_evidence(evidence_id: str) -> EvidenceExcerpt | None:
+    init_db()
+    with _conn() as db:
+        row = db.execute(
+            "SELECT * FROM evidence_excerpts WHERE evidence_id = ?", (evidence_id,)
+        ).fetchone()
+    return _evidence_from_row(row) if row else None
+
+
+def get_evidence_many(evidence_ids: list[str]) -> list[EvidenceExcerpt]:
+    if not evidence_ids:
+        return []
+    init_db()
+    placeholders = ",".join("?" for _ in evidence_ids)
+    with _conn() as db:
+        rows = db.execute(
+            f"SELECT * FROM evidence_excerpts WHERE evidence_id IN ({placeholders})",
+            evidence_ids,
+        ).fetchall()
+    return [_evidence_from_row(row) for row in rows]
+
+
+def get_evidence_for_item(item_id: str) -> list[EvidenceExcerpt]:
+    init_db()
+    with _conn() as db:
+        rows = db.execute(
+            "SELECT * FROM evidence_excerpts WHERE item_id = ? ORDER BY start_char",
+            (item_id,),
+        ).fetchall()
+    return [_evidence_from_row(row) for row in rows]
+
+
+def search_details(query: str, limit: int) -> list[ContentDetail]:
+    init_db()
+    escaped = query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    with _conn() as db:
+        rows = db.execute(
+            """
+            SELECT * FROM content_details
+            WHERE LOWER(normalized_text) LIKE ? ESCAPE '\\'
+            ORDER BY retrieved_at DESC
+            LIMIT ?
+            """,
+            (pattern, limit),
+        ).fetchall()
+    return [
+        ContentDetail(
+            item_id=row["item_id"],
+            url=row["url"],
+            normalized_text=row["normalized_text"],
+            retrieved_at=_ms_to_dt(row["retrieved_at"]),
+            content_hash=row["content_hash"],
+            content_type=row["content_type"],
+            truncated=bool(row["truncated"]),
+            warnings=json.loads(row["warnings_json"]),
+        )
+        for row in rows
+    ]
+
+
+def save_research_session(session: ResearchSession) -> None:
+    init_db()
+    with _conn() as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO research_sessions
+                (session_id, title, topic, filters_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session.session_id,
+                session.title,
+                session.topic,
+                json.dumps(session.filters),
+                _dt_to_ms(session.created_at),
+                _dt_to_ms(session.updated_at),
+            ),
+        )
+        db.commit()
+
+
+def get_research_session(session_id: str) -> ResearchSession | None:
+    init_db()
+    with _conn() as db:
+        row = db.execute(
+            "SELECT * FROM research_sessions WHERE session_id = ?", (session_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    return ResearchSession(
+        session_id=row["session_id"],
+        title=row["title"],
+        topic=row["topic"],
+        filters=json.loads(row["filters_json"]),
+        created_at=_ms_to_dt(row["created_at"]),
+        updated_at=_ms_to_dt(row["updated_at"]),
+    )
+
+
+def save_research_note(note: ResearchNote) -> None:
+    init_db()
+    with _conn() as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO research_notes
+                (note_id, session_id, text, evidence_ids_json, follow_up, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                note.note_id,
+                note.session_id,
+                note.text,
+                json.dumps(note.evidence_ids),
+                1 if note.follow_up else 0,
+                _dt_to_ms(note.created_at),
+            ),
+        )
+        db.execute(
+            "UPDATE research_sessions SET updated_at = ? WHERE session_id = ?",
+            (_dt_to_ms(note.created_at), note.session_id),
+        )
+        db.commit()
+
+
+def save_research_report(report: ResearchReport) -> None:
+    init_db()
+    with _conn() as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO research_reports
+                (report_id, session_id, title, markdown, evidence_ids_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                report.report_id,
+                report.session_id,
+                report.title,
+                report.markdown,
+                json.dumps(report.evidence_ids),
+                _dt_to_ms(report.created_at),
+            ),
+        )
+        db.execute(
+            "UPDATE research_sessions SET updated_at = ? WHERE session_id = ?",
+            (_dt_to_ms(report.created_at), report.session_id),
+        )
+        db.commit()
+
+
+def get_research_notes(session_id: str) -> list[ResearchNote]:
+    init_db()
+    with _conn() as db:
+        rows = db.execute(
+            "SELECT * FROM research_notes WHERE session_id = ? ORDER BY created_at",
+            (session_id,),
+        ).fetchall()
+    return [
+        ResearchNote(
+            note_id=row["note_id"],
+            session_id=row["session_id"],
+            text=row["text"],
+            evidence_ids=json.loads(row["evidence_ids_json"]),
+            follow_up=bool(row["follow_up"]),
+            created_at=_ms_to_dt(row["created_at"]),
+        )
+        for row in rows
+    ]
+
+
+def get_research_reports(session_id: str) -> list[ResearchReport]:
+    init_db()
+    with _conn() as db:
+        rows = db.execute(
+            "SELECT * FROM research_reports WHERE session_id = ? ORDER BY created_at",
+            (session_id,),
+        ).fetchall()
+    return [
+        ResearchReport(
+            report_id=row["report_id"],
+            session_id=row["session_id"],
+            title=row["title"],
+            markdown=row["markdown"],
+            evidence_ids=json.loads(row["evidence_ids_json"]),
+            created_at=_ms_to_dt(row["created_at"]),
+        )
+        for row in rows
+    ]
+
+
+def get_item_history_since(since: datetime | None, limit: int = 500) -> list[dict[str, object]]:
+    init_db()
+    since_ms = _dt_to_ms(since) if since else 0
+    with _conn() as db:
+        rows = db.execute(
+            """
+            SELECT * FROM item_history
+            WHERE first_seen_at >= ? OR last_changed_at >= ?
+            ORDER BY last_seen_at DESC
+            LIMIT ?
+            """,
+            (since_ms, since_ms, limit),
+        ).fetchall()
+    return [
+        {
+            "item": NewsItem.model_validate_json(row["payload_json"]),
+            "first_seen_at": _ms_to_dt(row["first_seen_at"]),
+            "last_seen_at": _ms_to_dt(row["last_seen_at"]),
+            "last_changed_at": _ms_to_dt(row["last_changed_at"]),
+            "content_hash": row["content_hash"],
+        }
+        for row in rows
+    ]
 
 
 def get_all_snapshots() -> list[SourceHealth]:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from .models import Category
+from .models import Category, EvidenceTier, SourceType
 
 if TYPE_CHECKING:
     from .fetchers.base import Fetcher
@@ -15,12 +15,15 @@ class SourceConfig:
     default_categories: list[Category] = field(default_factory=list)
     enabled: bool = True
     description: str = ""
+    source_type: SourceType = SourceType.OFFICIAL
+    evidence_tier: EvidenceTier = EvidenceTier.HIGH
 
 
 def _build_registry() -> "list[SourceConfig]":
     from .fetchers.docs_api import ApiDocsFetcher
     from .fetchers.docs_claude_code import ClaudeCodeDocsFetcher
     from .fetchers.github_events import GitHubOrgEventsFetcher
+    from .fetchers.github_issues import GitHubIssuesPullsFetcher
     from .fetchers.github_releases import GitHubReleasesFetcher
     from .fetchers.hackernews import HackerNewsFetcher
     from .fetchers.newsroom import NewsroomFetcher
@@ -49,6 +52,8 @@ def _build_registry() -> "list[SourceConfig]":
                 Category.BUSINESS,
             ],
             description="Anthropic's official news page (anthropic.com/news)",
+            source_type=SourceType.OFFICIAL,
+            evidence_tier=EvidenceTier.HIGH,
         ),
         SourceConfig(
             key="anthropic-status",
@@ -77,6 +82,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.CLAUDE_CODE],
             description="Claude Code release notes (CHANGELOG.md on GitHub)",
+            source_type=SourceType.DOCS,
+            evidence_tier=EvidenceTier.HIGH,
         ),
         SourceConfig(
             key="anthropic-docs-api",
@@ -84,6 +91,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.MODELS],
             description="Claude API release notes from platform.claude.com",
+            source_type=SourceType.DOCS,
+            evidence_tier=EvidenceTier.HIGH,
         ),
         SourceConfig(
             key="anthropic-docs-claude-apps",
@@ -91,6 +100,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.MODELS],
             description="Claude Apps release notes from docs.claude.com",
+            source_type=SourceType.DOCS,
+            evidence_tier=EvidenceTier.HIGH,
         ),
         SourceConfig(
             key="anthropic-docs-system-prompts",
@@ -98,6 +109,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.POLICY],
             description="System prompt release notes from docs.claude.com",
+            source_type=SourceType.DOCS,
+            evidence_tier=EvidenceTier.HIGH,
         ),
         SourceConfig(
             key="anthropic-support-release-notes",
@@ -105,6 +118,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.MODELS],
             description="Claude Help Center release notes from support.claude.com",
+            source_type=SourceType.DOCS,
+            evidence_tier=EvidenceTier.HIGH,
         ),
         SourceConfig(
             key="anthropic-economic-index",
@@ -133,6 +148,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=1800,
             default_categories=[Category.CLAUDE_CODE, Category.MODELS],
             description="GitHub releases from key anthropics/* repos",
+            source_type=SourceType.GITHUB,
+            evidence_tier=EvidenceTier.MEDIUM,
         ),
         SourceConfig(
             key="anthropic-github-events",
@@ -140,6 +157,17 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=1800,
             default_categories=[Category.CLAUDE_CODE],
             description="New repos and releases from the anthropics GitHub org",
+            source_type=SourceType.GITHUB,
+            evidence_tier=EvidenceTier.MEDIUM,
+        ),
+        SourceConfig(
+            key="anthropic-github-issues-prs",
+            fetcher_cls=GitHubIssuesPullsFetcher,
+            ttl_seconds=1800,
+            default_categories=[Category.CLAUDE_CODE, Category.ENGINEERING],
+            description="Recent issues and pull requests from selected Anthropic/MCP GitHub repos",
+            source_type=SourceType.GITHUB,
+            evidence_tier=EvidenceTier.MEDIUM,
         ),
         SourceConfig(
             key="hn-anthropic",
@@ -147,6 +175,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=1800,
             default_categories=[Category.COMMUNITY],
             description="Hacker News stories about Anthropic/Claude (≥10 points)",
+            source_type=SourceType.COMMUNITY,
+            evidence_tier=EvidenceTier.LOW,
         ),
         SourceConfig(
             key="reddit-claude",
@@ -154,6 +184,8 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.COMMUNITY],
             description="Hot posts from r/ClaudeAI and r/anthropic",
+            source_type=SourceType.COMMUNITY,
+            evidence_tier=EvidenceTier.LOW,
         ),
     ]
 

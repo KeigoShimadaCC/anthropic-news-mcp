@@ -4,7 +4,19 @@ from pathlib import Path
 import pytest
 
 from anthropic_news_mcp import cache as cache_mod
-from anthropic_news_mcp.models import Category, NewsItem, Source, SourceStatus
+from anthropic_news_mcp.models import (
+    Category,
+    ContentDetail,
+    EvidenceExcerpt,
+    EvidenceTier,
+    NewsItem,
+    ResearchNote,
+    ResearchReport,
+    ResearchSession,
+    Source,
+    SourceStatus,
+    SourceType,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -37,59 +49,38 @@ class TestDbPath:
         assert cache_mod.get_db_path() == override
         assert override.parent.exists()
 
-    def test_world_readable_dir_warns(self, tmp_path: Path) -> None:
+    def test_world_readable_dir_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """get_db_path() should warn when the cache directory is world-readable."""
-        import pytest
 
         pub = tmp_path / "pub_cache"
         pub.mkdir(mode=0o777)
-        cache_mod.set_db_path(pub / "cache.db")
-        # Clear override so get_db_path() re-runs the stat() check
         cache_mod._DB_PATH = None  # type: ignore[attr-defined]
-        import contextlib
+        monkeypatch.setenv("XDG_CACHE_HOME", str(pub))
 
-        with contextlib.suppress(ImportError):
-            import monkeypatch  # noqa: F401 — not available here; use env var approach
-
-        import os as _os
-
-        orig = _os.environ.get("XDG_CACHE_HOME")
-        _os.environ["XDG_CACHE_HOME"] = str(tmp_path / "pub_cache")
-        try:
-            with pytest.warns(UserWarning, match="world-readable"):
-                cache_mod.get_db_path()
-        finally:
-            if orig is None:
-                _os.environ.pop("XDG_CACHE_HOME", None)
-            else:
-                _os.environ["XDG_CACHE_HOME"] = orig
-            cache_mod.set_db_path(tmp_path / "test_cache.db")
+        with pytest.warns(UserWarning, match="world-readable"):
+            cache_mod.get_db_path()
 
     def test_stat_failure_does_not_crash(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """If stat() raises, get_db_path() should still return a path (non-fatal)."""
-        import os as _os
-
-        pub = tmp_path / "stat_fail"
-        pub.mkdir()
-        _os.environ["XDG_CACHE_HOME"] = str(pub.parent)
+        cache_home = tmp_path / "stat_fail"
+        expected_cache_dir = cache_home / "anthropic-news-mcp"
+        monkeypatch.setenv("XDG_CACHE_HOME", str(cache_home))
         cache_mod._DB_PATH = None  # type: ignore[attr-defined]
 
         original_stat = Path.stat
 
         def bad_stat(self: Path, **kwargs: object) -> object:
-            if self == (pub.parent / "stat_fail").resolve():
+            if self == expected_cache_dir.resolve():
                 raise OSError("simulated stat failure")
             return original_stat(self, **kwargs)
 
         monkeypatch.setattr(Path, "stat", bad_stat)
-        try:
-            result = cache_mod.get_db_path()
-            assert result is not None
-        finally:
-            _os.environ.pop("XDG_CACHE_HOME", None)
-            cache_mod.set_db_path(tmp_path / "test_cache.db")
+        result = cache_mod.get_db_path()
+        assert result == expected_cache_dir / "cache.db"
 
 
 class TestInit:
@@ -104,6 +95,9 @@ class TestInit:
         db.close()
         assert "source_snapshots" in tables
         assert "items" in tables
+        assert "content_details" in tables
+        assert "evidence_excerpts" in tables
+        assert "research_sessions" in tables
 
     def test_idempotent_init(self) -> None:
         cache_mod.init_db()
@@ -316,3 +310,68 @@ class TestGetAllSnapshots:
 
     def test_empty_when_no_data(self) -> None:
         assert cache_mod.get_all_snapshots() == []
+
+
+class TestResearchPersistence:
+    def test_content_detail_evidence_and_session_round_trip(self) -> None:
+        item = _item("detail-1", "https://anthropic.com/news/detail")
+        cache_mod.save_snapshot("anthropic-newsroom", [item], ttl_seconds=3600)
+        detail = ContentDetail(
+            item_id=item.id,
+            url=item.url,
+            normalized_text="Claude released a detailed research update.",
+            retrieved_at=datetime(2026, 1, 2, tzinfo=UTC),
+            content_hash="abc123",
+            content_type="text/html",
+        )
+        cache_mod.save_content_detail(detail)
+        assert cache_mod.get_content_detail(item.id) == detail
+
+        excerpt = EvidenceExcerpt(
+            evidence_id="ev1",
+            item_id=item.id,
+            url=item.url,
+            title=item.title,
+            source_key=item.source_key,
+            source_type=SourceType.OFFICIAL,
+            evidence_tier=EvidenceTier.HIGH,
+            text="Claude released a detailed research update.",
+            start_char=0,
+            end_char=41,
+            retrieved_at=datetime(2026, 1, 2, tzinfo=UTC),
+            content_hash="abc123",
+        )
+        cache_mod.save_evidence_excerpts([excerpt])
+        assert cache_mod.get_evidence("ev1") == excerpt
+        assert cache_mod.get_evidence_for_item(item.id) == [excerpt]
+
+        session = ResearchSession(
+            session_id="sess1",
+            title="Research",
+            topic="Claude",
+            filters={},
+            created_at=datetime(2026, 1, 2, tzinfo=UTC),
+            updated_at=datetime(2026, 1, 2, tzinfo=UTC),
+        )
+        cache_mod.save_research_session(session)
+        note = ResearchNote(
+            note_id="note1",
+            session_id="sess1",
+            text="Follow up",
+            evidence_ids=["ev1"],
+            follow_up=True,
+            created_at=datetime(2026, 1, 2, tzinfo=UTC),
+        )
+        report = ResearchReport(
+            report_id="rep1",
+            session_id="sess1",
+            title="Report",
+            markdown="# Report",
+            evidence_ids=["ev1"],
+            created_at=datetime(2026, 1, 2, tzinfo=UTC),
+        )
+        cache_mod.save_research_note(note)
+        cache_mod.save_research_report(report)
+        assert cache_mod.get_research_session("sess1") == session
+        assert cache_mod.get_research_notes("sess1") == [note]
+        assert cache_mod.get_research_reports("sess1") == [report]

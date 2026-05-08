@@ -12,12 +12,15 @@ _ALLOWED_FETCH_HOSTS = {
     "claude.ai",
     "docs.anthropic.com",
     "docs.claude.com",
+    "github.com",
     "hn.algolia.com",
+    "news.ycombinator.com",
     "platform.claude.com",
     "raw.githubusercontent.com",
     "reddit.com",
     "status.claude.com",
     "support.claude.com",
+    "www.anthropic.com",
     "www.reddit.com",
 }
 

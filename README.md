@@ -31,9 +31,20 @@ One failing source never blocks the others.
 | `get_recent_updates` | The main feed — filterable by source, category, and date |
 | `search_updates` | Keyword search over the local cache |
 | `get_source_health` | Operational status per source (fetched when, how many items, any error) |
+| `get_update_detail` | Fetch normalized full page text, stable excerpts, hashes, and provenance |
+| `search_web_sources` | Search configured sources by query, date, category, type, importance, and tags |
+| `get_timeline` | Build grouped chronological topic timelines with dedup clusters |
+| `compare_updates` | Show new and changed items since a timestamp |
+| `build_digest_context` | Return citation-ready evidence context for a client model to write a digest |
+| `create_research_session` | Create a local SQLite research session |
+| `save_research_note` | Save notes and follow-ups linked to evidence ids |
+| `save_research_report` | Save generated report Markdown linked to evidence ids |
+| `get_research_session` | Return session notes, reports, follow-ups, and linked evidence |
+| `evaluate_claims` | Deterministically match claims to evidence excerpts and flag support gaps |
 
-All tools are read-only. Returned item titles, summaries, authors, tags, and URLs are
-untrusted external data fetched from the public web.
+Most tools are read-only. Session/report/note tools persist local SQLite research state.
+Returned item titles, summaries, authors, tags, URLs, and fetched page text are untrusted
+external data fetched from the public web.
 
 ### Resources
 
@@ -42,6 +53,10 @@ untrusted external data fetched from the public web.
 | `anthropic-news://sources` | Configured sources, categories, TTLs, and enabled status |
 | `anthropic-news://health` | Cached source health without fetching remote sources |
 | `anthropic-news://source/{source_key}/latest` | Latest cached items for one source |
+| `anthropic-news://evidence/{evidence_id}` | Stored evidence excerpt by stable id |
+| `anthropic-news://session/{session_id}` | Saved research session with notes, reports, and evidence |
+| `anthropic-news://session/{session_id}/reports` | Saved reports for a session |
+| `anthropic-news://timeline/{session_id}` | Timeline context for a session topic |
 
 ### Prompts
 
@@ -50,6 +65,9 @@ untrusted external data fetched from the public web.
 | `latest_update_digest` | Summarize the latest updates with citations |
 | `source_health_report` | Diagnose stale or failing sources |
 | `weekly_category_digest` | Build a weekly digest for one category |
+| `generate_digest` | Ask the client model to write prose from `build_digest_context` |
+| `verify_claims_against_evidence` | Ask the client model to explain `evaluate_claims` results |
+| `research_session_brief` | Summarize a saved research session |
 
 ### Categories
 
@@ -74,6 +92,7 @@ untrusted external data fetched from the public web.
 | `anthropic-trust-policy` | Official RSP, safety, policy, trust, transparency, and safeguards updates |
 | `anthropic-github-releases` | Releases from `claude-code`, Python/TS SDKs, MCP spec |
 | `anthropic-github-events` | New repos and release events from the `anthropics` org |
+| `anthropic-github-issues-prs` | Recent issues and PRs from selected Anthropic/MCP repos |
 | `hn-anthropic` | Hacker News stories about Anthropic/Claude (≥10 points) |
 | `reddit-claude` | Hot posts from `r/ClaudeAI` and `r/anthropic` |
 
@@ -208,6 +227,7 @@ Claude Desktop / Cursor
         ├─ list_sources
         ├─ get_recent_updates ──► async gather across all sources
         ├─ search_updates      ──► SQLite FTS (substring)
+        ├─ research tools      ──► details, evidence, timelines, sessions
         ├─ get_source_health
         ├─ resources
         └─ prompts
@@ -230,6 +250,7 @@ Claude Desktop / Cursor
     │ Business/Trust filtered sources   │
     │ GitHubReleasesFetcher (30 min)    │
     │ GitHubOrgEventsFetcher (30 min)   │
+    │ GitHubIssuesPullsFetcher (30 min) │
     │ HackerNewsFetcher     (30 min)    │
     │ RedditFetcher         (60 min)    │
     └───────────────────────────────────┘
@@ -247,6 +268,10 @@ Claude Desktop / Cursor
 - **SQLite with WAL** — supports concurrent readers in a single server instance.
   The cache lives at `~/.cache/anthropic-news-mcp/cache.db` by default and can be changed
   with `ANTHROPIC_NEWS_MCP_CACHE_DB`. Multi-instance shared storage is future work.
+- **Evidence-first research** — detail, digest, timeline, and claim tools return evidence
+  packages, excerpts, hashes, and support labels. They do not call an LLM or generate prose.
+- **SQLite v2 research state** — full-content details, stable evidence excerpts, item
+  history, sessions, notes, and reports are stored alongside the existing cache.
 - **Untrusted source model** — fetched content is returned as data only. Clients should not
   execute or follow instructions contained in titles, summaries, tags, or linked pages.
 
