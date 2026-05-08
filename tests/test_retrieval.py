@@ -1,6 +1,6 @@
 """Tests for the retrieval layer (aggregation, dedup, filtering)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -32,7 +32,7 @@ def _make_item(
         source=Source.ANTHROPIC,
         source_key=source_key,
         category=category or [Category.MODELS],
-        published_at=published_at or datetime(2026, 1, 1, tzinfo=timezone.utc),
+        published_at=published_at or datetime(2026, 1, 1, tzinfo=UTC),
         importance=1,
     )
 
@@ -87,6 +87,40 @@ class TestGetRecentUpdates:
         assert len(result) == 1
 
     @pytest.mark.asyncio
+    async def test_deduplicates_canonical_and_filtered_sources(self):
+        url = "https://anthropic.com/news/aws-compute?utm_medium=social"
+        clean = "https://anthropic.com/news/aws-compute"
+        cache_mod.save_snapshot(
+            "anthropic-newsroom",
+            [_make_item("canonical", url, category=[Category.BUSINESS])],
+            ttl_seconds=3600,
+        )
+        cache_mod.save_snapshot(
+            "anthropic-business-infrastructure",
+            [
+                _make_item(
+                    "filtered",
+                    clean,
+                    source_key="anthropic-business-infrastructure",
+                    category=[Category.BUSINESS],
+                )
+            ],
+            ttl_seconds=3600,
+        )
+        result, _ = await get_recent_updates(
+            sources=["anthropic-newsroom", "anthropic-business-infrastructure"]
+        )
+        assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_empty_source_handling(self):
+        cache_mod.save_snapshot("anthropic-status", [], ttl_seconds=3600)
+        result, healths = await get_recent_updates(sources=["anthropic-status"])
+        assert result == []
+        assert len(healths) == 1
+        assert healths[0].item_count == 0
+
+    @pytest.mark.asyncio
     async def test_category_filter(self):
         items = [
             _make_item("c1", "https://anthropic.com/1", category=[Category.MODELS]),
@@ -105,18 +139,18 @@ class TestGetRecentUpdates:
             _make_item(
                 "d1",
                 "https://anthropic.com/d1",
-                published_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+                published_at=datetime(2026, 3, 1, tzinfo=UTC),
             ),
             _make_item(
                 "d2",
                 "https://anthropic.com/d2",
-                published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                published_at=datetime(2026, 1, 1, tzinfo=UTC),
             ),
         ]
         cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=3600)
         result, _ = await get_recent_updates(
             sources=["anthropic-newsroom"],
-            since=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            since=datetime(2026, 2, 1, tzinfo=UTC),
         )
         assert len(result) == 1
         assert result[0].id == "d1"
@@ -136,17 +170,17 @@ class TestGetRecentUpdates:
             _make_item(
                 "f1",
                 "https://anthropic.com/f1",
-                published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                published_at=datetime(2026, 1, 1, tzinfo=UTC),
             ),
             _make_item(
                 "f2",
                 "https://anthropic.com/f2",
-                published_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+                published_at=datetime(2026, 3, 1, tzinfo=UTC),
             ),
             _make_item(
                 "f3",
                 "https://anthropic.com/f3",
-                published_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+                published_at=datetime(2026, 2, 1, tzinfo=UTC),
             ),
         ]
         cache_mod.save_snapshot("anthropic-newsroom", items, ttl_seconds=3600)

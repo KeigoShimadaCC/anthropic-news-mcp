@@ -1,0 +1,12 @@
+{
+  "scheduled_maintenances": [
+    {
+      "id": "maint-none",
+      "name": "Scheduled maintenance",
+      "status": "scheduled",
+      "impact": "none",
+      "scheduled_for": "2026-05-10T01:00:00Z",
+      "shortlink": "https://stspg.io/example-maint"
+    }
+  ]
+}

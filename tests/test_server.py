@@ -1,7 +1,7 @@
 """Server integration tests using FastMCP.call_tool()."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -27,7 +27,7 @@ def _seed(source_key: str = "anthropic-newsroom", n: int = 3) -> list[NewsItem]:
             source=Source.ANTHROPIC,
             source_key=source_key,
             category=[Category.MODELS],
-            published_at=datetime(2026, 5, i + 1, tzinfo=timezone.utc),
+            published_at=datetime(2026, 5, i + 1, tzinfo=UTC),
             importance=2,
         )
         for i in range(n)
@@ -66,9 +66,13 @@ async def test_list_sources_returns_all() -> None:
     assert "sources" in data
     keys = [s["key"] for s in data["sources"]]
     assert "anthropic-newsroom" in keys
+    assert "anthropic-status" in keys
+    assert "anthropic-engineering" in keys
+    assert "anthropic-economic-index" in keys
+    assert "anthropic-trust-policy" in keys
     assert "hn-anthropic" in keys
     assert "reddit-claude" in keys
-    assert len(keys) == 7  # All configured sources
+    assert len(keys) == 16  # All configured sources
 
 
 @pytest.mark.asyncio
@@ -92,7 +96,7 @@ async def test_get_recent_updates_category_filter() -> None:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.MODELS],
-            published_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            published_at=datetime(2026, 5, 1, tzinfo=UTC),
             importance=2,
         ),
         NewsItem(
@@ -103,7 +107,7 @@ async def test_get_recent_updates_category_filter() -> None:
             source=Source.ANTHROPIC,
             source_key="anthropic-newsroom",
             category=[Category.COMMUNITY],
-            published_at=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            published_at=datetime(2026, 5, 2, tzinfo=UTC),
             importance=1,
         ),
     ]
@@ -114,6 +118,30 @@ async def test_get_recent_updates_category_filter() -> None:
     )
     assert len(data["items"]) == 1
     assert data["items"][0]["id"] == "cat-models"
+
+
+@pytest.mark.asyncio
+async def test_get_recent_updates_new_category_filter() -> None:
+    items = [
+        NewsItem(
+            id="cat-ops",
+            title="Status incident",
+            summary="",
+            url="https://status.claude.com/incidents/1",  # type: ignore[arg-type]
+            source=Source.ANTHROPIC,
+            source_key="anthropic-status",
+            category=[Category.OPS],
+            published_at=datetime(2026, 5, 1, tzinfo=UTC),
+            importance=3,
+        )
+    ]
+    cache_mod.save_snapshot("anthropic-status", items, ttl_seconds=3600)
+    data = await _call(
+        "get_recent_updates",
+        {"sources": ["anthropic-status"], "categories": ["ops"]},
+    )
+    assert len(data["items"]) == 1
+    assert data["items"][0]["id"] == "cat-ops"
 
 
 @pytest.mark.asyncio
@@ -163,6 +191,20 @@ async def test_get_recent_updates_invalid_category_graceful() -> None:
     assert "not-a-real-category" in data["error"]
     # Valid keys should be listed in the error
     assert "models" in data["error"]
+    assert "ops" in data["error"]
+    assert "engineering" in data["error"]
+    assert "economics" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_recent_updates_new_source_key_from_seeded_cache() -> None:
+    _seed("anthropic-engineering", n=1)
+    data = await _call(
+        "get_recent_updates",
+        {"sources": ["anthropic-engineering"], "limit": 5},
+    )
+    assert len(data["items"]) == 1
+    assert data["items"][0]["source_key"] == "anthropic-engineering"
 
 
 @pytest.mark.asyncio

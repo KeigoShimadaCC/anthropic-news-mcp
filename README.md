@@ -12,8 +12,9 @@ tool surface for LLM clients like Claude Desktop and Cursor.
 
 ## Why
 
-Anthropic ships fast. Signals land across `anthropic.com/news`, three docs release-note
-pages, four GitHub repos, Hacker News, and Reddit. Tracking these manually is noise.
+Anthropic ships fast. Signals land across official news, research, engineering, status,
+docs release notes, support release notes, GitHub repos, Hacker News, and Reddit.
+Tracking these manually is noise.
 
 This MCP server consolidates them into four tools that any MCP client can call. The data
 is cached locally in SQLite so repeat queries are sub-millisecond. One failing source never
@@ -32,15 +33,25 @@ blocks the others.
 
 ### Categories
 
-`models` · `claude-code` · `research` · `policy` · `business` · `community`
+`models` · `claude-code` · `research` · `policy` · `business` · `community` ·
+`ops` · `engineering` · `economics`
 
 ### Sources
 
 | Key | What it covers |
 |-----|----------------|
 | `anthropic-newsroom` | `anthropic.com/news` — official announcements, research, products |
+| `anthropic-status` | Claude Status incidents and scheduled maintenance from `status.claude.com` |
+| `anthropic-research` | Research publications from `anthropic.com/research` |
+| `anthropic-engineering` | Engineering posts from `anthropic.com/engineering` |
 | `anthropic-docs-claude-code` | `CHANGELOG.md` from the `anthropics/claude-code` repo |
 | `anthropic-docs-api` | API release notes from `platform.claude.com` |
+| `anthropic-docs-claude-apps` | Claude Apps release notes from `docs.claude.com` |
+| `anthropic-docs-system-prompts` | System prompt release notes from `docs.claude.com` |
+| `anthropic-support-release-notes` | Claude Help Center release notes from `support.claude.com` |
+| `anthropic-economic-index` | Economic Index and Economic Research updates |
+| `anthropic-business-infrastructure` | Official compute, funding, partnership, enterprise, and infrastructure updates |
+| `anthropic-trust-policy` | Official RSP, safety, policy, trust, transparency, and safeguards updates |
 | `anthropic-github-releases` | Releases from `claude-code`, Python/TS SDKs, MCP spec |
 | `anthropic-github-events` | New repos and release events from the `anthropics` org |
 | `hn-anthropic` | Hacker News stories about Anthropic/Claude (≥10 points) |
@@ -119,6 +130,8 @@ Edit `~/.cursor/mcp.json` (or Settings → MCP → Edit config):
 | `GITHUB_TOKEN` | No | Raises GitHub API rate limit from 60 → 5,000 req/hr. Get one at [github.com/settings/tokens](https://github.com/settings/tokens) (no scopes needed for public repos). |
 | `ANTHROPIC_API_KEY` | Eval only | Required to run `evals/run_eval.py`. |
 
+No API key is required for the official Anthropic, Claude Status, docs, or support sources.
+
 ---
 
 ## Try it
@@ -157,8 +170,16 @@ Claude Desktop / Cursor
                 ▼  (on cache miss or TTL expiry)
     ┌───────────────────────────────────┐
     │ NewsroomFetcher    (30 min TTL)   │
+    │ StatusFetcher       (5 min)       │
+    │ ResearchFetcher     (60 min)      │
+    │ EngineeringFetcher  (60 min)      │
     │ ClaudeCodeDocsFetcher (60 min)    │
     │ ApiDocsFetcher        (60 min)    │
+    │ ClaudeAppsDocsFetcher (60 min)    │
+    │ SystemPromptsDocsFetcher (60 min) │
+    │ SupportReleaseNotesFetcher (60m)  │
+    │ EconomicIndexFetcher (120 min)    │
+    │ Business/Trust filtered sources   │
     │ GitHubReleasesFetcher (30 min)    │
     │ GitHubOrgEventsFetcher (30 min)   │
     │ HackerNewsFetcher     (30 min)    │
@@ -182,7 +203,7 @@ Claude Desktop / Cursor
 
 ## Eval results
 
-This server ships with a 20-prompt eval suite using `claude-haiku-4-5` as judge.
+This server ships with a golden-prompt eval suite using `claude-haiku-4-5` as judge.
 
 Each prompt is scored on three dimensions (0–2 each):
 
@@ -192,7 +213,7 @@ Each prompt is scored on three dimensions (0–2 each):
 | Faithfulness | No hallucinated content |
 | Helpfulness | Clear, useful to the user |
 
-**Pass threshold: mean ≥ 5.0 / 6.0 across 20 prompts.**
+**Pass threshold: mean ≥ 5.0 / 6.0 across all prompts.**
 
 See [`evals/`](./evals/) for the full methodology, golden Q&A pairs, and rubric.
 
@@ -202,6 +223,9 @@ To run the eval yourself:
 export ANTHROPIC_API_KEY=sk-ant-...
 pip install -e ".[eval]"
 python evals/run_eval.py
+
+# Deterministic seeded-cache eval data
+python evals/run_eval.py --seed-cache
 ```
 
 ---
@@ -232,8 +256,14 @@ ruff format .
 # Type check
 mypy --strict src/
 
-# Tests (107 tests, offline — no live HTTP calls)
+# Tests (offline — no live HTTP calls)
 pytest tests/ -v
+
+# Live source-health audit (opt-in, not part of CI)
+anthropic-news-audit
+anthropic-news-audit --sources anthropic-status,anthropic-engineering
+anthropic-news-audit --json evals/results/source_audit_$(date -u +%Y%m%dT%H%M%SZ).json
+anthropic-news-audit --strict
 
 # Run the server locally
 python -m anthropic_news_mcp

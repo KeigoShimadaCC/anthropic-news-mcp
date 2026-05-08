@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import datetime
 
 from mcp.server.fastmcp import FastMCP
@@ -55,7 +56,8 @@ async def get_recent_updates(
         sources: Optional list of source keys to restrict to, e.g. ["anthropic-newsroom"].
                  Omit to query all enabled sources. Use list_sources to discover keys.
         categories: Optional list of category filters. Valid values:
-                    "models", "claude-code", "research", "policy", "business", "community".
+                    "models", "claude-code", "research", "policy", "business",
+                    "community", "ops", "engineering", "economics".
         since: Optional ISO 8601 datetime. Only items published after this are returned.
                Example: "2026-04-01T00:00:00Z" or "2026-04-01".
         limit: Maximum items to return. Default 20, max 100.
@@ -75,10 +77,8 @@ async def get_recent_updates(
 
     parsed_since: datetime | None = None
     if since:
-        try:
+        with suppress(ValueError):
             parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
-        except ValueError:
-            pass
 
     parsed_categories: list[Category] | None = None
     if categories:

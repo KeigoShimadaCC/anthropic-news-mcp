@@ -1,27 +1,30 @@
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     MODELS = "models"
     CLAUDE_CODE = "claude-code"
     RESEARCH = "research"
     POLICY = "policy"
     BUSINESS = "business"
     COMMUNITY = "community"
+    OPS = "ops"
+    ENGINEERING = "engineering"
+    ECONOMICS = "economics"
 
 
-class Source(str, Enum):
+class Source(StrEnum):
     ANTHROPIC = "anthropic"
     GITHUB = "github"
     REDDIT = "reddit"
     HACKERNEWS = "hackernews"
 
 
-class SourceStatus(str, Enum):
+class SourceStatus(StrEnum):
     LIVE = "live"
     CACHE = "cache"
     STALE = "stale"

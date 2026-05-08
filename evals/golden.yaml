@@ -1,5 +1,5 @@
-# 20 golden Q&A pairs for the anthropic-news-mcp eval suite.
-# Distributed: 8 routing, 5 freshness, 4 search precision, 3 graceful failure.
+# Golden Q&A pairs for the anthropic-news-mcp eval suite.
+# Distributed across routing, freshness, search precision, and graceful failure.
 
 # ── Routing ────────────────────────────────────────────────────────────────────
 
@@ -279,3 +279,113 @@
   rubric_notes: >
     Invalid source key. Should not crash. Should tell the user the key is
     invalid and ideally suggest using list_sources to see valid keys.
+
+- id: q21
+  category: routing
+  prompt: "Is Claude or the API having an outage right now?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-status
+    categories_must_include_any:
+      - ops
+  expected_response_must_contain_any:
+    - status
+    - outage
+    - operational
+    - incident
+  rubric_notes: "Operational status questions should route to the Claude Status source."
+
+- id: q22
+  category: routing
+  prompt: "Show recent Anthropic engineering posts about agents."
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-engineering
+    categories_must_include_any:
+      - engineering
+  expected_response_must_contain_any:
+    - engineering
+    - agents
+    - Anthropic
+  rubric_notes: "Engineering blog queries should target the engineering source/category."
+
+- id: q23
+  category: routing
+  prompt: "What has Anthropic published about the Economic Index?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-economic-index
+    categories_must_include_any:
+      - economics
+  expected_response_must_contain_any:
+    - Economic Index
+    - economic
+    - research
+  rubric_notes: "Economic Index questions should use the dedicated economics source or category."
+
+- id: q24
+  category: routing
+  prompt: "Any recent Claude Desktop or mobile app release notes?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-docs-claude-apps
+      - anthropic-support-release-notes
+  expected_response_must_contain_any:
+    - Claude
+    - app
+    - Desktop
+    - mobile
+    - release notes
+  rubric_notes: "Claude app release-note prompts should avoid API-only release notes."
+
+- id: q25
+  category: routing
+  prompt: "Have Claude's system prompts changed recently?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-docs-system-prompts
+  expected_response_must_contain_any:
+    - system prompt
+    - prompt
+    - changed
+    - release notes
+  rubric_notes: "System prompt questions should target system prompt release notes."
+
+- id: q26
+  category: routing
+  prompt: "Find Anthropic updates about compute, funding, partnerships, or enterprise demand."
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-business-infrastructure
+    categories_must_include_any:
+      - business
+  expected_response_must_contain_any:
+    - compute
+    - funding
+    - partnership
+    - enterprise
+    - infrastructure
+  rubric_notes: "Business infrastructure queries should use the filtered official source."
+
+- id: q27
+  category: routing
+  prompt: "What has Anthropic said recently about RSP, red-teaming, or trustworthy agents?"
+  expected_tool: get_recent_updates
+  expected_params:
+    sources_must_include_any:
+      - anthropic-trust-policy
+    categories_must_include_any:
+      - policy
+  expected_response_must_contain_any:
+    - RSP
+    - safety
+    - policy
+    - trust
+    - red-team
+  rubric_notes: "Trust and policy prompts should route to policy or trust-policy."

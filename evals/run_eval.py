@@ -2,7 +2,7 @@
 """
 Eval harness for anthropic-news-mcp.
 
-Drives the MCP server as a subprocess, sends 20 golden prompts to
+Drives the MCP server tools in-process, sends golden prompts to
 claude-haiku-4-5, then uses a second Haiku call as LLM judge to score
 each response on tool selection, faithfulness, and helpfulness (0-2 each).
 
@@ -19,10 +19,9 @@ import asyncio
 import html as html_lib
 import json
 import os
-import subprocess
 import sys
 import textwrap
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -135,6 +134,7 @@ def _judge(
     """Ask Haiku to score the response. Returns {tool_selection, faithfulness, helpfulness}."""
     tool_calls_str = json.dumps(tool_calls, indent=2) if tool_calls else "(none)"
     expected_tool = html_lib.escape(str(golden.get("expected_tool", "any")))
+    expected_params = golden.get("expected_params", {})
     expected_contains = golden.get("expected_response_must_contain_any", [])
     rubric_notes = html_lib.escape(str(golden.get("rubric_notes", "")))
 
@@ -154,6 +154,9 @@ def _judge(
 
         ## Expected tool
         {expected_tool}
+
+        ## Expected parameters
+        {json.dumps(expected_params, indent=2)}
 
         ## Tools actually called
         <untrusted_data>
@@ -213,10 +216,90 @@ def _build_tool_schemas() -> list[dict]:  # type: ignore[type-arg]
     return tools
 
 
-async def run(ids: list[str] | None = None) -> None:
+def _seed_cache() -> None:
+    """Seed deterministic eval cache snapshots for offline regression checks."""
+    sys.path.insert(0, str(_ROOT / "src"))
+    from anthropic_news_mcp import cache
+    from anthropic_news_mcp.config import SOURCE_REGISTRY
+    from anthropic_news_mcp.models import Category, NewsItem, Source
+
+    now = datetime(2026, 5, 8, tzinfo=UTC)
+    seed_items = {
+        "anthropic-newsroom": [
+            ("seed-news-1", "Claude model update", [Category.MODELS], "Latest Claude announcement."),
+            ("seed-news-2", "Responsible Scaling Policy update", [Category.POLICY], "RSP safety update."),
+        ],
+        "anthropic-status": [
+            ("seed-status-1", "Claude Status: All Systems Operational", [Category.OPS], "No active incidents."),
+        ],
+        "anthropic-research": [
+            ("seed-research-1", "Research paper on model behavior", [Category.RESEARCH], "Anthropic research publication."),
+        ],
+        "anthropic-engineering": [
+            ("seed-eng-1", "Building effective agents", [Category.ENGINEERING], "Engineering post about agents."),
+        ],
+        "anthropic-docs-claude-code": [
+            ("seed-code-1", "Claude Code changelog", [Category.CLAUDE_CODE], "Claude Code release shipped this week."),
+        ],
+        "anthropic-docs-api": [
+            ("seed-api-1", "API Release Notes: Sonnet 4.5", [Category.MODELS], "API model release notes."),
+        ],
+        "anthropic-docs-claude-apps": [
+            ("seed-apps-1", "Claude Apps Release Notes", [Category.MODELS], "Desktop and mobile app updates."),
+        ],
+        "anthropic-docs-system-prompts": [
+            ("seed-prompts-1", "System Prompt Release Notes", [Category.POLICY], "System prompt transparency changes."),
+        ],
+        "anthropic-support-release-notes": [
+            ("seed-support-1", "Claude Help Center Release Notes", [Category.MODELS], "Claude app release notes."),
+        ],
+        "anthropic-economic-index": [
+            ("seed-econ-1", "Anthropic Economic Index", [Category.ECONOMICS, Category.RESEARCH], "Economic research on AI at work."),
+        ],
+        "anthropic-business-infrastructure": [
+            ("seed-biz-1", "Compute partnership expansion", [Category.BUSINESS], "Business infrastructure and enterprise demand."),
+        ],
+        "anthropic-trust-policy": [
+            ("seed-trust-1", "Trust and safety transparency update", [Category.POLICY], "Safeguards, red-team, and policy update."),
+        ],
+        "anthropic-github-releases": [
+            ("seed-gh-1", "Python SDK release", [Category.MODELS], "Anthropic Python SDK release."),
+        ],
+        "anthropic-github-events": [
+            ("seed-ghe-1", "New anthropics repository", [Category.CLAUDE_CODE], "GitHub org event."),
+        ],
+        "hn-anthropic": [
+            ("seed-hn-1", "HN discussion about Anthropic", [Category.COMMUNITY], "Hacker News story with points."),
+        ],
+        "reddit-claude": [
+            ("seed-reddit-1", "r/ClaudeAI community post", [Category.COMMUNITY], "Reddit community discussion."),
+        ],
+    }
+    for config in SOURCE_REGISTRY:
+        raw_items = seed_items.get(config.key, [])
+        items = [
+            NewsItem(
+                id=item_id,
+                title=title,
+                summary=summary,
+                url=f"https://anthropic.com/news/{item_id}",  # type: ignore[arg-type]
+                source=Source.ANTHROPIC,
+                source_key=config.key,
+                category=categories,
+                published_at=now,
+                importance=2,
+            )
+            for item_id, title, categories, summary in raw_items
+        ]
+        cache.save_snapshot(config.key, items, ttl_seconds=24 * 3600)
+
+
+async def run(ids: list[str] | None = None, seed_cache: bool = False) -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         sys.exit("ANTHROPIC_API_KEY env var is required")
+    if seed_cache:
+        _seed_cache()
 
     client = anthropic.Anthropic(api_key=api_key)
     golden_prompts = _load_golden(ids)
@@ -260,7 +343,7 @@ async def run(ids: list[str] | None = None) -> None:
     print(f"{'='*60}")
 
     # Write results
-    ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
     output = {
         "timestamp": ts,
         "model": _MODEL,
@@ -281,6 +364,11 @@ async def run(ids: list[str] | None = None) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run anthropic-news-mcp eval suite")
     parser.add_argument("--ids", help="Comma-separated list of prompt IDs to run (e.g. q01,q02)")
+    parser.add_argument(
+        "--seed-cache",
+        action="store_true",
+        help="Preload deterministic offline snapshots before running prompts",
+    )
     args = parser.parse_args()
     ids = args.ids.split(",") if args.ids else None
-    asyncio.run(run(ids))
+    asyncio.run(run(ids, seed_cache=args.seed_cache))

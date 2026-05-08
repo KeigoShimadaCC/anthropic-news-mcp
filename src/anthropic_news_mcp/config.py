@@ -24,6 +24,17 @@ def _build_registry() -> "list[SourceConfig]":
     from .fetchers.github_releases import GitHubReleasesFetcher
     from .fetchers.hackernews import HackerNewsFetcher
     from .fetchers.newsroom import NewsroomFetcher
+    from .fetchers.official import (
+        BusinessInfrastructureFetcher,
+        ClaudeAppsDocsFetcher,
+        EconomicIndexFetcher,
+        EngineeringFetcher,
+        ResearchFetcher,
+        StatusFetcher,
+        SupportReleaseNotesFetcher,
+        SystemPromptsDocsFetcher,
+        TrustPolicyFetcher,
+    )
     from .fetchers.reddit import RedditFetcher
 
     return [
@@ -40,6 +51,27 @@ def _build_registry() -> "list[SourceConfig]":
             description="Anthropic's official news page (anthropic.com/news)",
         ),
         SourceConfig(
+            key="anthropic-status",
+            fetcher_cls=StatusFetcher,
+            ttl_seconds=300,
+            default_categories=[Category.OPS],
+            description="Claude Status incidents and scheduled maintenance from status.claude.com",
+        ),
+        SourceConfig(
+            key="anthropic-research",
+            fetcher_cls=ResearchFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.RESEARCH],
+            description="Anthropic research publications from anthropic.com/research",
+        ),
+        SourceConfig(
+            key="anthropic-engineering",
+            fetcher_cls=EngineeringFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.ENGINEERING],
+            description="Anthropic engineering posts from anthropic.com/engineering",
+        ),
+        SourceConfig(
             key="anthropic-docs-claude-code",
             fetcher_cls=ClaudeCodeDocsFetcher,
             ttl_seconds=3600,
@@ -52,6 +84,48 @@ def _build_registry() -> "list[SourceConfig]":
             ttl_seconds=3600,
             default_categories=[Category.MODELS],
             description="Claude API release notes from platform.claude.com",
+        ),
+        SourceConfig(
+            key="anthropic-docs-claude-apps",
+            fetcher_cls=ClaudeAppsDocsFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.MODELS],
+            description="Claude Apps release notes from docs.claude.com",
+        ),
+        SourceConfig(
+            key="anthropic-docs-system-prompts",
+            fetcher_cls=SystemPromptsDocsFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.POLICY],
+            description="System prompt release notes from docs.claude.com",
+        ),
+        SourceConfig(
+            key="anthropic-support-release-notes",
+            fetcher_cls=SupportReleaseNotesFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.MODELS],
+            description="Claude Help Center release notes from support.claude.com",
+        ),
+        SourceConfig(
+            key="anthropic-economic-index",
+            fetcher_cls=EconomicIndexFetcher,
+            ttl_seconds=7200,
+            default_categories=[Category.ECONOMICS, Category.RESEARCH],
+            description="Anthropic Economic Index and economic research updates",
+        ),
+        SourceConfig(
+            key="anthropic-business-infrastructure",
+            fetcher_cls=BusinessInfrastructureFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.BUSINESS],
+            description="Official Anthropic business, compute, partnership, funding, and enterprise updates",
+        ),
+        SourceConfig(
+            key="anthropic-trust-policy",
+            fetcher_cls=TrustPolicyFetcher,
+            ttl_seconds=3600,
+            default_categories=[Category.POLICY],
+            description="Official Anthropic trust, safety, policy, RSP, transparency, and safeguards updates",
         ),
         SourceConfig(
             key="anthropic-github-releases",

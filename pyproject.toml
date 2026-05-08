@@ -29,6 +29,7 @@ dev = [
 
 [project.scripts]
 anthropic-news-mcp = "anthropic_news_mcp.server:main"
+anthropic-news-audit = "anthropic_news_mcp.audit:main"
 
 [project.urls]
 Homepage = "https://github.com/KeigoShimadaCC/anthropic-news-mcp"
