@@ -97,8 +97,8 @@ jobs:
           path: docs/api
           retention-days: 14
 
-      - name: Validate AGENTS.md
-        run: python scripts/validate_agents_md.py
+      - name: Validate AGENTS.md (links + smoke commands)
+        run: python scripts/validate_agents_md.py --smoke
 
       - name: Dead feature flag detection
         run: python scripts/check_flags.py
