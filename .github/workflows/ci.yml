@@ -74,7 +74,7 @@ jobs:
         run: pytest -q --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.xml
@@ -91,7 +91,7 @@ jobs:
         run: pdoc src/anthropic_news_mcp -o docs/api --docformat google
 
       - name: Upload API docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-docs
           path: docs/api
