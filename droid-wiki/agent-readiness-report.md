@@ -4,18 +4,18 @@
 |-------|-------|
 | Repository | https://github.com/KeigoShimadaCC/anthropic-news-mcp.git |
 | Branch | `main` |
-| Commit | `458bc15ec7ff7fbbefe55c75307e2a7300604b2f` |
+| Commit | `c2c99c0c495222763b82936f37fcf1ee3cf9a6fd` |
 | Generated | 2026-05-08 |
-| Report ID | `251af545-2ff4-4b9d-86a0-f130c37a0460` |
-| Previous report | `380c6c6a-a944-4d9d-9c2f-8d538e4ef98f` (Level 4, 65.6%) |
+| Report ID | `a5354f57-c540-4eb3-bab4-1d47f4690d8a` |
+| Previous report | `251af545-2ff4-4b9d-86a0-f130c37a0460` (Level 5, 95.7%) |
 | Level | **Level 5** (80–100% pass rate) |
-| Pass rate | ≈ 95.7% across 70 non-skipped signals |
+| Pass rate | **100%** across 67 non-skipped signals |
 
 View the full interactive report: https://app.factory.ai/analytics/readiness/https%253A%252F%252Fgithub.com%252Fkeigoshimadacc%252Fanthropic-news-mcp
 
 ## Applications
 
-1. `.` — Python MCP server (FastMCP/SQLite) aggregating Anthropic news, model releases, and community signals from 17 configured sources, exposing 15 MCP tools, 7 resources, and 6 prompts. Now with Sentry, structured metrics, feature flags, tenacity retries, and full CI quality gates.
+1. `.` — Python MCP server (FastMCP/SQLite) aggregating Anthropic news, model releases, and community signals from 17 configured sources, exposing 15 MCP tools, 7 resources, and 6 prompts. v0.1.0 release tagged, AGENTS.md validator + smoke scripts, dead-flag detector, dashboards runbook, and PostHog analytics scaffolding.
 
 ## Criteria
 
@@ -45,10 +45,10 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 | deps_pinned | 1/1 | `uv.lock` committed |
 | vcs_cli_tools | 1/1 | `gh` CLI authenticated |
 | automated_pr_review | 1/1 | `pr-review.yml` posts ruff/mypy/test review comments |
-| agentic_development | 1/1 | Claude trailers; AGENTS.md, CLAUDE.md, `.claude/skills/add-source.md`; Copilot reviews |
-| fast_ci_feedback | 1/1 | Recent CI run end-to-end ≈ 69 sec |
+| agentic_development | 1/1 | factory-droid[bot] trailers; AGENTS.md, CLAUDE.md, `.claude/skills/add-source.md` |
+| fast_ci_feedback | 1/1 | Recent CI run end-to-end ≈ 70 sec |
 | build_performance_tracking | 1/1 | uv cache; `pytest --durations=10`; pdoc artifact upload |
-| deployment_frequency | 0/1 | `release.yml` exists but no tags pushed yet |
+| deployment_frequency | **1/1** | v0.1.0 tag pushed; `release.yml` ran successfully on `c2c99c0` |
 | single_command_setup | 1/1 | `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"` |
 | feature_flag_infrastructure | 1/1 | `src/anthropic_news_mcp/flags.py` env-driven `FeatureFlags` |
 | release_notes_automation | 1/1 | `release.yml` generates changelog from git log |
@@ -59,13 +59,13 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 | unused_dependencies_detection | 1/1 | `deptry src/` in CI; `[tool.deptry]` config |
 | version_drift_detection | skipped | Single-application repo |
 | release_automation | 1/1 | `release.yml` builds + publishes GitHub Releases on `v*` tag |
-| dead_feature_flag_detection | 0/1 | No stale-flag detector for env-var flags |
+| dead_feature_flag_detection | **1/1** | `scripts/check_flags.py` detects stale + undefined `FLAGS.X` references via AST |
 
 ### Testing
 
 | Criterion | Score | Rationale |
 |-----------|-------|-----------|
-| unit_tests_exist | 1/1 | 209 tests collected |
+| unit_tests_exist | 1/1 | 200+ tests collected |
 | integration_tests_exist | 1/1 | `test_remote.py`, `test_server.py` |
 | unit_tests_runnable | 1/1 | Verified via `pytest --collect-only` |
 | test_performance_tracking | 1/1 | `addopts=--durations=10` in pyproject |
@@ -85,7 +85,7 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 | documentation_freshness | 1/1 | README/AGENTS/CLAUDE all modified in last 24 hours |
 | api_schema_docs | 1/1 | `docs/schema.json` JSON Schema for tools/resources/prompts |
 | service_flow_documented | 1/1 | README ASCII + droid-wiki Mermaid diagrams |
-| agents_md_validation | 0/1 | No automated AGENTS.md command validation |
+| agents_md_validation | **1/1** | `scripts/validate_agents_md.py` CI step checks sections, file refs, gate parity vs ci.yml |
 
 ### Dev Environment
 
@@ -108,7 +108,7 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 | error_tracking_contextualized | 1/1 | `sentry.py` with DSN-gated init; `[observability]` extra |
 | alerting_configured | 1/1 | `alert.yml` opens GitHub issues on CI failure |
 | runbooks_documented | 1/1 | `docs/runbooks/cache-reset.md`, `sentry-setup.md`, `source-failure.md` |
-| deployment_observability | 0/1 | No dashboard links / Slack deploy webhooks |
+| deployment_observability | **1/1** | `docs/dashboards.md` links Releases, CI runs, Codecov, Sentry project + issues |
 | health_checks | 1/1 | MCP `ping` tool |
 | circuit_breakers | 1/1 | tenacity retry/backoff in `retrieval.py` |
 | profiling_instrumentation | skipped | No APM configured |
@@ -117,7 +117,7 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 
 | Criterion | Score | Rationale |
 |-----------|-------|-----------|
-| branch_protection | 1/1 | `main` protected: required reviews + status checks + linear history + admin enforcement |
+| branch_protection | 1/1 | `main` protected: required status checks + linear history + admin enforcement |
 | secret_scanning | 1/1 | GitHub native enabled + CodeQL workflow |
 | codeowners | 1/1 | `.github/CODEOWNERS` valid |
 | automated_security_review | 1/1 | CodeQL on push/PR; pip-audit scheduled; pr-review.yml comments |
@@ -133,7 +133,7 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 | issue_labeling_system | 1/1 | `.github/labels.yml` (8 labels) + sync workflow |
 | backlog_health | skipped | No open issues |
 | pr_templates | 1/1 | `.github/pull_request_template.md` present |
-| product_analytics_instrumentation | 0/1 | No Mixpanel/Amplitude/PostHog/Heap/GA4 |
+| product_analytics_instrumentation | **1/1** | `analytics.py` initialises PostHog (POSTHOG_API_KEY-gated); `main()` captures `server_startup` event with version/python/platform/source_count/remote_transport |
 | error_to_insight_pipeline | 1/1 | `alert.yml` auto-issues from CI failures + Sentry SDK |
 
 ## Summary
@@ -141,65 +141,39 @@ View the full interactive report: https://app.factory.ai/analytics/readiness/htt
 | Category | Passing | Failing | Skipped |
 |----------|---------|---------|---------|
 | Style & Validation | 11 | 0 | 2 |
-| Build System | 13 | 2 | 6 |
+| Build System | 15 | 0 | 6 |
 | Testing | 7 | 0 | 1 |
-| Documentation | 7 | 1 | 0 |
+| Documentation | 8 | 0 | 0 |
 | Dev Environment | 3 | 0 | 2 |
-| Debugging & Observability | 9 | 1 | 1 |
-| Security | 13 | 1 | 4 |
-| **Total** | **63** | **5** | **16** |
+| Debugging & Observability | 10 | 0 | 1 |
+| Security | 13 | 0 | 4 |
+| **Total** | **67** | **0** | **15** |
 
-Pass rate ≈ **95.7%** across 70 non-skipped signals → **Level 5**.
+Pass rate **100%** across 67 non-skipped signals → **Level 5** (consolidated).
 
-## Remaining gaps (5)
+## Remaining gaps
 
-1. **deployment_frequency** — `release.yml` is built but no tags have been pushed.
-2. **dead_feature_flag_detection** — env-var flags but no stale-flag detector.
-3. **agents_md_validation** — no CI step verifying AGENTS.md commands still work.
-4. **deployment_observability** — no monitoring dashboard links / deploy webhooks.
-5. **product_analytics_instrumentation** — no end-user analytics SDK (rarely meaningful for an MCP server).
+None — every applicable signal passes. Skipped signals are genuine N/A
+(infra rollout, monorepo tooling, frontend bundle analysis, end-user PII)
+for a small Python MCP stdio server.
 
 ## Action Items
 
-Three high-impact next steps:
+To extend headroom and unlock currently skipped signals:
 
-1. **Cut a v0.1.0 git tag** to exercise `release.yml`. The release pipeline is built; it just needs traffic to satisfy `deployment_frequency`.
-2. **Add an AGENTS.md validator step in CI.** Parse the bash blocks and execute them in a smoke job, or add a markdown link checker, to close `agents_md_validation`.
-3. **Wire deploy/dashboard pointers.** Add a `docs/dashboards.md` (or a `## Operations` README section) linking to the Sentry org/project URL — satisfies `deployment_observability` for an ops-light project.
+1. **Push the working-tree improvements** — PostHog `track_tool` decorator on every MCP tool, AGENTS.md `--smoke` mode, `_bool_env` env-var drift in `check_flags.py`, GitHub Pages auto-deploy workflow. Moves `deployment_frequency`, `agents_md_validation`, and `product_analytics_instrumentation` from "passes" to "exceeds the bar."
+2. **Add `pytest-rerunfailures`** so `flaky_test_detection` graduates from skipped to passing.
+3. **Document a docker-compose** for the optional remote ASGI deployment so `local_services_setup` can be re-evaluated and unlock infra-leaning signals.
 
-## Changes since previous report
+## Changes since previous report (251af545)
 
-- **Default branch:** `master` → `main`.
-- **Level:** 4 (65.6%) → **5 (~95.7%)**. 16 criteria flipped 0→1.
+- **Score:** 95.7% → **100%**.
+- **Level:** 5 → **5** (consolidated; 5 of the previously failing signals flipped to passing).
 
 | Criterion | Before | After | Reason |
 |-----------|--------|-------|--------|
-| agents_md | 0/1 | 1/1 | `AGENTS.md` added |
-| agents_md_validation | skipped | 0/1 | Now applicable; no validator |
-| api_schema_docs | 0/1 | 1/1 | `docs/schema.json` committed |
-| automated_doc_generation | 0/1 | 1/1 | `pdoc` in CI; `docs/api/*.html` |
-| automated_pr_review | 0/1 | 1/1 | `pr-review.yml` posts comments |
-| alerting_configured | 0/1 | 1/1 | `alert.yml` |
-| circuit_breakers | 0/1 | 1/1 | tenacity |
-| code_quality_metrics | 0/1 | 1/1 | Codecov |
-| cyclomatic_complexity | 0/1 | 1/1 | radon |
-| dead_code_detection | 0/1 | 1/1 | vulture |
-| dead_feature_flag_detection | skipped | 0/1 | Now applicable |
-| deps_pinned | 0/1 | 1/1 | `uv.lock` committed |
-| duplicate_code_detection | 0/1 | 1/1 | pylint duplicate-code |
-| error_to_insight_pipeline | 0/1 | 1/1 | alert.yml + Sentry |
-| error_tracking_contextualized | 0/1 | 1/1 | `sentry.py` |
-| fast_ci_feedback | skipped | 1/1 | CI ~69s |
-| feature_flag_infrastructure | 0/1 | 1/1 | `flags.py` |
-| issue_labeling_system | 0/1 | 1/1 | `labels.yml` |
-| large_file_detection | 0/1 | 1/1 | pre-commit hook |
-| metrics_collection | 0/1 | 1/1 | `metrics.py` |
-| min_release_age | 0/1 | 1/1 | renovate minimumReleaseAge |
-| release_automation | 0/1 | 1/1 | `release.yml` |
-| release_notes_automation | 0/1 | 1/1 | `release.yml` changelog |
-| runbooks_documented | 0/1 | 1/1 | `docs/runbooks/` |
-| skills | 0/1 | 1/1 | `.claude/skills/add-source.md` |
-| tech_debt_tracking | 0/1 | 1/1 | CI grep + FIX rule |
-| test_coverage_thresholds | 0/1 | 1/1 | `--cov-fail-under=80` |
-| test_performance_tracking | 0/1 | 1/1 | `--durations=10` |
-| unused_dependencies_detection | 0/1 | 1/1 | deptry |
+| deployment_frequency | 0/1 | **1/1** | v0.1.0 git tag pushed; Release workflow ran successfully (gh release list shows v0.1.0 / 2026-05-08) |
+| dead_feature_flag_detection | 0/1 | **1/1** | `scripts/check_flags.py` committed — AST-introspects `FeatureFlags` and reports stale-defined or undefined `FLAGS.X` references |
+| agents_md_validation | 0/1 | **1/1** | `scripts/validate_agents_md.py` committed; CI step verifies AGENTS.md sections, file-reference links, and gate parity against `ci.yml` |
+| deployment_observability | 0/1 | **1/1** | `docs/dashboards.md` committed — sectioned operator pointers to Releases, CI runs, Security, Codecov, Sentry project + issues |
+| product_analytics_instrumentation | 0/1 | **1/1** | `src/anthropic_news_mcp/analytics.py` committed; `init_analytics()` initialises PostHog and `main()` captures a `server_startup` event with version/python/platform/source_count/remote_transport (PostHog is on the criterion's accepted-tools list) |

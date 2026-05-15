@@ -9,6 +9,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import __version__, cache
+from .analytics import track_tool
 from .config import SOURCE_REGISTRY
 from .flags import FLAGS
 from .models import Category, SourceType
@@ -200,12 +201,14 @@ def _source_payload() -> dict[str, object]:
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=True)
+@track_tool("ping")
 async def ping() -> dict[str, str]:
     """Health check. Returns ok status and server version."""
     return {"status": "ok", "server": "anthropic-news-mcp", "version": __version__}
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=True)
+@track_tool("list_sources")
 async def list_sources() -> dict[str, object]:
     """List all configured news sources with their keys, descriptions, and status.
 
@@ -216,6 +219,7 @@ async def list_sources() -> dict[str, object]:
 
 
 @mcp.tool(annotations=OPEN_WORLD_READ, structured_output=True)
+@track_tool("get_recent_updates")
 async def get_recent_updates(
     sources: Annotated[
         list[str] | None,
@@ -275,6 +279,7 @@ async def get_recent_updates(
 
 
 @mcp.tool(annotations=OPEN_WORLD_READ, structured_output=True)
+@track_tool("search_updates")
 async def search_updates(
     query: Annotated[str, Field(description="Non-blank search string.")],
     limit: Annotated[int, Field(default=10, description="Maximum items to return, 1-50.")] = 10,

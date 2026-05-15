@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
-"""Validate AGENTS.md: check file references exist and CI commands are documented."""
+"""Validate AGENTS.md: check file references exist, CI commands are documented,
+and the documented Quick Start commands are still executable.
 
+The "smoke" mode runs read-only versions of the documented commands (e.g.
+``ruff check --no-fix``, ``pytest --collect-only``) to confirm they remain
+runnable. Run it locally with ``--smoke`` or in CI as a separate step.
+"""
+
+import argparse
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 AGENTS_MD = REPO_ROOT / "AGENTS.md"
+
+# Smoke-test commands. Each entry is (label, argv). They must all be read-only
+# and fast (< 30s typical). The test passes if every command exits 0.
+SMOKE_COMMANDS: list[tuple[str, list[str]]] = [
+    ("ruff check", ["ruff", "check", ".", "--no-fix"]),
+    ("ruff format check", ["ruff", "format", "--check", "."]),
+    ("pytest collect", ["pytest", "--collect-only", "-q"]),
+]
 
 
 def check_file_references(content: str) -> list[str]:
@@ -78,7 +95,50 @@ def check_ci_gate_coverage(content: str) -> list[str]:
     return errors
 
 
+def _resolve(executable: str) -> str | None:
+    """Prefer ``.venv/bin/<executable>`` if present, fall back to PATH."""
+    venv_bin = REPO_ROOT / ".venv" / "bin" / executable
+    if venv_bin.is_file():
+        return str(venv_bin)
+    return shutil.which(executable)
+
+
+def run_smoke_commands() -> list[str]:
+    """Execute documented commands in dry-run/collect-only mode and return errors."""
+    errors: list[str] = []
+    for label, argv in SMOKE_COMMANDS:
+        resolved = _resolve(argv[0])
+        if resolved is None:
+            errors.append(f"smoke[{label}]: '{argv[0]}' not on PATH and not in .venv/bin")
+            continue
+        full_argv = [resolved, *argv[1:]]
+        try:
+            result = subprocess.run(  # noqa: S603 — argv is a hard-coded literal list
+                full_argv,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            errors.append(f"smoke[{label}]: timed out after 120s")
+            continue
+        if result.returncode != 0:
+            tail = (result.stdout + result.stderr).strip().splitlines()[-5:]
+            errors.append(f"smoke[{label}]: exit {result.returncode}\n    " + "\n    ".join(tail))
+    return errors
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Also execute documented commands in read-only mode.",
+    )
+    args = parser.parse_args()
+
     if not AGENTS_MD.exists():
         print("ERROR: AGENTS.md not found at repo root", file=sys.stderr)
         return 1
@@ -90,14 +150,19 @@ def main() -> int:
     all_errors.extend(check_file_references(content))
     all_errors.extend(check_ci_gate_coverage(content))
 
+    if args.smoke:
+        all_errors.extend(run_smoke_commands())
+
     if all_errors:
         print("AGENTS.md validation failed:", file=sys.stderr)
         for err in all_errors:
             print(f"  - {err}", file=sys.stderr)
         return 1
 
+    mode = " (with smoke tests)" if args.smoke else ""
     print(
-        f"AGENTS.md validation passed ({len(content)} bytes, no broken links or missing sections)"
+        f"AGENTS.md validation passed{mode} "
+        f"({len(content)} bytes, no broken links or missing sections)"
     )
     return 0
 
