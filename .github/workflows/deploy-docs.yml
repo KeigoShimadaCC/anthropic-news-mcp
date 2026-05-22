@@ -59,7 +59,7 @@ jobs:
 
       - name: Create GitHub Deployment record
         id: deployment-record
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const sha = context.sha;
@@ -82,7 +82,7 @@ jobs:
 
       - name: Mark deployment success
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const id = '${{ steps.deployment-record.outputs.deployment_id }}';
@@ -100,7 +100,7 @@ jobs:
 
       - name: Mark deployment failure
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const id = '${{ steps.deployment-record.outputs.deployment_id }}';
